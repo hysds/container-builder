@@ -1,0 +1,272 @@
+commit 52d9f4799ff1c58976d69896405ecb59553c17f6
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Tue Oct 3 15:54:14 2017 +0000
+
+    remove hard paths to python; remove unused script
+
+commit 533dda855d3c9bb8dea061c326502e53936666b1
+Author: M Starch <lestarch@googlemail.com>
+Date:   Tue Sep 26 13:32:36 2017 -0700
+
+    mstarch: adding in flow diagram
+
+commit 097b9bf52ff0ba52f75f999c7723e57a68018b94
+Author: Michael D Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Sep 26 13:28:54 2017 -0700
+
+    mstarch: adding README.md
+
+commit 4ed1db94428fde5c1c69ac796c68e7a3f4755d59
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Sep 12 00:14:05 2017 +0000
+
+    mstarch: exit (success) if no hysds-ios exist
+
+commit 2e2c230b667ca578114c4e79bcaa927c266e6453
+Author: M Starch <Michael.D.Starch>
+Date:   Fri Apr 21 15:51:35 2017 +0000
+
+    mstarch: fixing validate to test for regexs
+
+commit d0c3a22698ec88ab1117538aab4772aa8f6614bf
+Merge: 77168b2 0abaa37
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Apr 12 18:16:13 2017 +0000
+
+    Merge branch 'master' of https://github.jpl.nasa.gov/hysds-org/container-builder
+
+commit 77168b276cd95d84b1c28fc0361ef88867eb45ab
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Apr 12 18:16:03 2017 +0000
+
+    mstarch: adding type checking in validate
+
+commit 0abaa37af57fd52b2ec47da1ec2c22fedd579cf4
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Mar 27 16:00:06 2017 +0000
+
+    keep docker repo clean by removing intermediate containers left by failed builds
+
+commit 4b0fa5afe83928c6038bd67f0b31fd51406ed37d
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Mar 23 16:15:22 2017 +0000
+
+    mstarch: fixing validation
+
+commit f0a2760096efe1dc761b82ebd2ee62d82ff0f57b
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Mar 22 23:07:56 2017 +0000
+
+    mstarch: fixing validator
+
+commit 9973336a7b4a5567c2e2a22053e0c9507634460d
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Mar 22 22:28:19 2017 +0000
+
+    mstarch: adding more validation for justin
+
+commit c8057389d3d3257c70dd2c44a33cabe33c324821
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Thu Mar 16 23:50:29 2017 +0000
+
+    add script to automatically configure job
+
+commit a105ad84cff265ca22f33e28475d89d7a00cfc13
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Mar 15 18:15:32 2017 +0000
+
+    mstarch: removing uppercase check
+
+commit c308cab4275e7b82c554c01e6b65fea26a2a8a6b
+Merge: 525db08 aa1a803
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Mar 15 18:13:12 2017 +0000
+
+    Merge branch 'v2'
+
+commit aa1a80385f0f48fe72f6d052a489886d0e3181a2
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Mar 15 18:12:32 2017 +0000
+
+    mstarch: fixing lowercase tags, lambda builtins
+
+commit 525db08d47c6ccec9053a962b5ea647f0296462d
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Wed Mar 1 18:18:53 2017 +0000
+
+    fail if repo name contains upper case letters; docker doesn't like them
+
+commit 722f0a5c851736e1728358b5299320afd8e0f6bd
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Feb 8 01:59:52 2017 +0000
+
+    mstarch: making container builder scripts callable by developers
+
+commit f9736cc27dd1fb1380fc90d6fc5d7cd422004d8f
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 6 20:58:44 2017 +0000
+
+    add missing bracket
+
+commit 884a9697ffad6eb39072659219387bee588832b9
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Feb 6 19:16:40 2017 +0000
+
+    mstarch: supporting encryption on S3
+
+commit af74a2bdd9b4c59a1841f9f2bebd2ee93b885037
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Feb 1 23:22:13 2017 +0000
+
+    mstarch: allowing mozart differentiation for hysds-io ingest
+
+commit 1c7a34a38c3b00791d2b0b962503afc053dbf5be
+Merge: 23c120c 894fe58
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Sun Jan 29 05:00:10 2017 +0000
+
+    Merge branch 'v2' of https://github.jpl.nasa.gov/hysds-org/container-builder into v2
+
+commit 23c120ce8ae38ad89db0cf25fff09dfa9dc0d55c
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Sun Jan 29 04:59:33 2017 +0000
+
+    mstarch: changed to repos as docker is usually ignored
+
+commit e60ce7a056a9dc4ac31c80f57a04a52c03cd2927
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Sun Jan 29 04:58:28 2017 +0000
+
+    mstarch: not cleaning docker/repos to enable user to pull in repos
+
+commit 894fe587e799f148fe9ccbd154257d3fd860200e
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Wed Jan 25 16:27:36 2017 +0000
+
+    remove previous image if exists to prevent accumulation of orphaned images
+
+commit de800a83bde537e897dfe3e9c28ce941e7621f8a
+Author: gmanipon <gmanipon@jpl.nasa.gov>
+Date:   Mon Jan 23 23:31:48 2017 +0000
+
+    use parallel gzip for speedup
+
+commit 21782f46de13f791b031ea2f267570cb60cfceef
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jan 19 01:24:51 2017 +0000
+
+    mstarch: fixing typo in git clean call check
+
+commit 1bcc7c477119bbb60e3a858e62b5af0ea874a523
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Jan 18 22:59:43 2017 +0000
+
+    mstarch: updating to use hysds_commons lib
+
+commit 474ed46f285096087c4c49165bc4579cc2d58879
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Jan 18 22:33:38 2017 +0000
+
+    mstarch: cleaning repo first for hysds-org/general#319
+
+commit 59af706119518978a434a2041f6cb75ffcf08b1a
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Jan 18 20:28:06 2017 +0000
+
+    mstarch: added setup.sh ability
+
+commit 03af696f73b345a609293d51ad3428c01897c785
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Fri Jan 13 20:45:35 2017 +0000
+
+    mstarch: adding validate to build process
+
+commit fc2527ddb005955e2c1874b2adc48bd7424b52a3
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Fri Jan 13 20:42:13 2017 +0000
+
+    mstarch: adding validator for hysds-io and job-spec JSON
+
+commit 0f33746462e8e372a46866019a3e4eb4495b4ec9
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jan 12 20:25:06 2017 +0000
+
+    mstarch: resource should be 'jobspec' for hysds-org/general#268
+
+commit 3a23fa5d14da9b2cc57c2a34e54e1f1bedd2ac72
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jan 12 19:04:49 2017 +0000
+
+    mstarch: adding resource types for hysds-org/general#268
+
+commit 7118a473a5f044926ae93648ffbbe400b895845d
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jan 5 22:18:07 2017 +0000
+
+    mstarch: fixing to use correct product names
+
+commit 7c196988ee0f06823ce7f0cb840d172abe84c1b3
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Jan 5 00:27:19 2017 +0000
+
+    mstarch: updated for REST interface not dataset ingest
+
+commit 686baf9315933c4b9e83a11dc790eea7915b4a77
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Mon Nov 21 22:22:40 2016 +0000
+
+    mstarch: updated for hysds-io.json
+
+commit d1cf1f15304c62d8f66ab9b0bf68100a33b6d956
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Nov 15 00:57:01 2016 +0000
+
+    mstarch: order of extra docker args
+
+commit 9ae7d32698406114cdc283ded7aef3d3a5987c95
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Nov 15 00:55:44 2016 +0000
+
+    mstarch: fixing extra params input
+
+commit 26f5bc06a959c66d45e7cbb553f934c344e68d4b
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Nov 15 00:49:48 2016 +0000
+
+    mstarch: allow passing in of Docker params
+
+commit f6c568b649c8ba149306a18cb6fa978dd229e6d7
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Mon Nov 14 23:53:07 2016 +0000
+
+    mstarch: working container builder
+
+commit 8d4a369c0d18dbd70549a9697fd8b10e0facdf67
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Nov 10 01:45:28 2016 +0000
+
+    mstarch: renaming product to dataset
+
+commit a5f9b07c5ab380c7ff40cb6677a7e62cd31debe3
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Thu Nov 10 01:40:19 2016 +0000
+
+    mstarch: changes for v2 datasets and revised prototype
+
+commit 52c648c9484dd286aab8b619b7e7dc570f574e78
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Wed Oct 26 19:42:11 2016 +0000
+
+    mstarch: refinements for container building
+
+commit 732abac49143333f60b7b5469fa4162e00b377cf
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Oct 25 21:32:47 2016 +0000
+
+    mstarch: filling in container
+
+commit a1595eb1f98d43d160c5c367294781a18bd2e972
+Author: M Starch <Michael.D.Starch@jpl.nasa.gov>
+Date:   Tue Oct 25 19:25:51 2016 +0000
+
+    mstarch: initial commit of container-builder
