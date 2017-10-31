@@ -16,6 +16,37 @@ shift
 #An array to map containers to annotations
 declare -A containers
 declare -A specs
+
+# detect branch or tag
+IS_TAG=0
+DESCRIBED_TAG=$(git describe --exact-match --tags HEAD)
+if (( $? == 0 ))
+then
+    IS_TAG=1
+fi
+echo "[CI] Is checkout a tag: ${IS_TAG} ${DESCRIBED_TAG}"
+
+#Get last log message
+LAST_LOG=$(git log -1)
+echo "[CI] Last log: ${LAST_LOG}"
+
+# extract any flags from last log
+SKIP_IMAGE_BUILD_FLAG=0
+GREP_SKIP_IMAGE_BUILD=$(echo $LAST_LOG | grep -i SKIP_IMAGE_BUILD)
+if (( $? == 0 ))
+then
+    SKIP_IMAGE_BUILD_FLAG=1
+fi
+echo "[CI] Skip image build flag: ${SKIP_IMAGE_BUILD_FLAG}"
+
+# skip image build? only if checkout is a branch and SKIP_IMAGE_BUILD is set
+SKIP_IMAGE_BUILD=0
+if [[ $IS_TAG -eq 0 ]] && [[ $SKIP_IMAGE_BUILD_FLAG -eq 1 ]]
+then
+    SKIP_IMAGE_BUILD=1
+    echo "[CI] Image build will be skipped."
+fi
+
 #Use git to cleanly remove any artifacts
 git clean -ffdq -e repos
 if (( $? != 0 ))
@@ -58,40 +89,42 @@ do
     GZ="${TAR}.gz" 
     #Remove previous container if exists
     PREV_ID=$(docker images -q $PRODUCT)
-    if [[ ! -z "$PREV_ID" ]]
-    then
-        echo "[CI] Removing current image for ${PRODUCT}: ${PREV_ID}"
-        docker rmi -f ${PREV_ID}
-    fi
-    #Build container
-    echo "[CI] Build for: ${PRODUCT} and file ${NAME}"
-    #Build docker container
-    echo " docker build --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} $@ ."
-    docker build --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} "$@" .
-    if (( $? != 0 ))
-    then
-        echo "[ERROR] Failed to build docker container for: ${PRODUCT}" 1>&2
-        exit 4
-    fi
-    #Save out the docker image
-    docker save -o ./${TAR} ${PRODUCT}
-    if (( $? != 0 ))
-    then
-        echo "[ERROR] Failed to save docker container for: ${PRODUCT}" 1>&2
-        exit 5
-    fi
-    #GZIP it
-    pigz -f ./${TAR}
-    if (( $? != 0 ))
-    then
-        echo "[ERROR] Failed to GZIP container for: ${PRODUCT}" 1>&2
-        exit 6
-    fi
-    ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} 
-    if (( $? != 0 ))
-    then
-        echo "[ERROR] Failed to make metadata and store container for: ${PRODUCT}" 1>&2
-        exit 7
+    if (( ${SKIP_IMAGE_BUILD} == 0 )); then
+        if [[ ! -z "$PREV_ID" ]]
+        then
+            echo "[CI] Removing current image for ${PRODUCT}: ${PREV_ID}"
+            docker rmi -f ${PREV_ID}
+        fi
+        #Build container
+        echo "[CI] Build for: ${PRODUCT} and file ${NAME}"
+        #Build docker container
+        echo " docker build --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} $@ ."
+        docker build --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} "$@" .
+        if (( $? != 0 ))
+        then
+            echo "[ERROR] Failed to build docker container for: ${PRODUCT}" 1>&2
+            exit 4
+        fi
+        #Save out the docker image
+        docker save -o ./${TAR} ${PRODUCT}
+        if (( $? != 0 ))
+        then
+            echo "[ERROR] Failed to save docker container for: ${PRODUCT}" 1>&2
+            exit 5
+        fi
+        #GZIP it
+        pigz -f ./${TAR}
+        if (( $? != 0 ))
+        then
+            echo "[ERROR] Failed to GZIP container for: ${PRODUCT}" 1>&2
+            exit 6
+        fi
+        ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} 
+        if (( $? != 0 ))
+        then
+            echo "[ERROR] Failed to make metadata and store container for: ${PRODUCT}" 1>&2
+            exit 7
+        fi
     fi
     containers[${NAME}]=${PRODUCT}
     #Attempt to remove dataset
