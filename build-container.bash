@@ -119,7 +119,9 @@ do
             echo "[ERROR] Failed to GZIP container for: ${PRODUCT}" 1>&2
             exit 6
         fi
-        ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} 
+        # get sha256 digest
+        DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ${PRODUCT} | cut -d'@' -f 2)
+        ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${DIGEST}
         if (( $? != 0 ))
         then
             echo "[ERROR] Failed to make metadata and store container for: ${PRODUCT}" 1>&2
