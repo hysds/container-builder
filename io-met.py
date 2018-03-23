@@ -18,8 +18,10 @@ def add_hysds_io(rest_url, metadata):
 
     # copy existing allowed accounts
     if doc is not None:
-        metadata['allowed_accounts'] = list(metadata['allowed_accounts'] + 
-                                            doc['result'].get('allowed_accounts', []))
+        merged_accounts = list(set(metadata.get('allowed_accounts', []) + 
+                                   doc['result'].get('allowed_accounts', [])))
+        if len(merged_accounts) > 0:
+            metadata['allowed_accounts'] = merged_accounts
 
     # index
     requests_json_response("POST", os.path.join(rest_url ,"hysds_io/add"),
