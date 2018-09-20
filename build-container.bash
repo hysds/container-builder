@@ -1,5 +1,5 @@
 #!/bin/bash
-if (( $# < 3 ))
+if (( $# < 5 ))
 then
     echo "[ERROR] Build script requires REPO and TAG"
     exit 1
@@ -9,6 +9,10 @@ DIR=$(dirname ${0})
 REPO="${1}"
 TAG="${2}"
 STORAGE="${3}"
+MOZART_REST_URL="${4}"
+GRQ_REST_URL="${5}"
+shift
+shift
 shift
 shift
 shift
@@ -121,7 +125,7 @@ do
         fi
         # get image digest (sha256)
         digest=$(docker inspect --format='{{index .Id}}' ${PRODUCT} | cut -d'@' -f 2)
-        ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest}
+        ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
         if (( $? != 0 ))
         then
             echo "[ERROR] Failed to make metadata and store container for: ${PRODUCT}" 1>&2
@@ -151,7 +155,7 @@ do
         cont=${containers[${REPO}]}
     fi
     echo "Running Job-Met on: ${cont} docker/${specification} ${TAG} ${PRODUCT}"
-    ${DIR}/job-met.py docker/${specification} ${cont} ${TAG}
+    ${DIR}/job-met.py docker/${specification} ${cont} ${TAG} ${MOZART_REST_URL}
     if (( $? != 0 ))
     then
         echo "[ERROR] Failed to create metadata and ingest job-spec for: ${PRODUCT}" 1>&2
@@ -183,7 +187,7 @@ do
         spec=${specs[${REPO}]}
     fi
     echo "Running IO-Met on: ${cont} docker/${wiring} ${TAG} ${PRODUCT}"
-    ${DIR}/io-met.py docker/${wiring} ${spec} ${TAG}
+    ${DIR}/io-met.py docker/${wiring} ${spec} ${TAG} ${MOZART_REST_URL} ${GRQ_REST_URL}
     if (( $? != 0 ))
     then
         echo "[ERROR] Failed to create metadata and ingest hysds-io for: ${PRODUCT}" 1>&2

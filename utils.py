@@ -3,7 +3,6 @@ import os
 import re
 import subprocess
 import hysds_commons.request_utils
-from hysds.celery import app
 
 TYPE_TAIL_RE=re.compile(".*/([^/]*).json.?(.*)")
 REPO_RE=re.compile(".*/([^/ ]+).git")
@@ -38,24 +37,21 @@ def get_product_id(specification,version):
         name = get_repo(os.basename(specification))
     return "{0}-{1}:{2}".format(ptype,name,version)
 
-def check_exists(item,tosca=False):
+def check_exists(item, rest_url):
     '''
     Checks the existence of item in ES
     @param item: item to check
     @return: True if item exists
     '''
 
-    es = app.conf["MOZART_REST_URL"]
-    if tosca:
-        es = app.conf["TOSCA_REST_URL"]
     ptype = "container"
     if item.startswith("job"):
         ptype = "job_spec"
     elif item.startswith("hysds_io"):
         ptype = "hysds_io"
-    es = os.path.join(es,"{0}/{1}?id={2}".format(ptype,"info" if item.startswith("container") else "type",item))
+    url = os.path.join(rest_url,"{0}/{1}?id={2}".format(ptype,"info" if item.startswith("container") else "type",item))
     try:
-        hysds_commons.request_utils.requests_json_response("GET",es,verify=False)
+        hysds_commons.request_utils.requests_json_response("GET",url,verify=False)
         return True
     except Exception as e:
         print("Failed to find {0} because of {1}.{2}".format(item,type(e),e))
