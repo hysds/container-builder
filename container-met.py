@@ -21,7 +21,7 @@ if __name__ == "__main__":
     mozart_rest_url = sys.argv[6]
     url = os.path.join(repo, os.path.basename(product))
     # OSAKA call goes here
-    osaka.main.put("./"+product, url, params={"encrypt": {"type": "AES256"}})
+    osaka.main.put("./"+product, url)
     metadata = {"name": ident, "version": version,
                 "url": url, "resource": "container", "digest": digest}
     hysds_commons.request_utils.requests_json_response("POST", os.path.join(
