@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import print_function
+
 import os
 import os.path
 import re
@@ -111,11 +111,11 @@ def check_from(prefix,io):
         param_type = param.get("type", "undefined")
         check_true(param_type != "undefined", False, "{0} defines hysds-io parameter {1} without a type".format(prefix,name))
         param_type = param.get("type", "text")
-        check_true(param_type in HYSDS_IO_VALID_PARAM_TYPES.keys(), True, "{0} defines hysds-io parameter {1} with invalid type {2}".format(prefix, name, param_type))
+        check_true(param_type in list(HYSDS_IO_VALID_PARAM_TYPES.keys()), True, "{0} defines hysds-io parameter {1} with invalid type {2}".format(prefix, name, param_type))
         for field in HYSDS_IO_VALID_PARAM_TYPES.get(param_type,[]):
             check_true(field in param, True, "{0} defines hysds-io parameter {1} with type {2} but not required field {3}".format(prefix, name, param_type, field))
         default_value = param.get("default", "none")
-        check_true(isinstance(default_value, basestring), True, "{0} defines hysds-io parameter {1} with default that is not a string.".format(prefix, name))
+        check_true(isinstance(default_value, str), True, "{0} defines hysds-io parameter {1} with default that is not a string.".format(prefix, name))
 def check_to(prefix,spec):
     '''
      
@@ -151,14 +151,14 @@ def pair(jsons):
     '''
     objects = {}
     reg = re.compile("^.*/(.*)\.json\.?(.*)$")
-    for k,v in jsons.iteritems():
+    for k,v in jsons.items():
         match = reg.match(k)
         name = match.group(2)
         f_type = match.group(1)
         if not name in objects:
             objects[name] = {}
         objects[name][f_type] = v
-    for k,v in objects.iteritems():
+    for k,v in objects.items():
         for f_type in ["hysds-io","job-spec"]:
             check_true(f_type in v,False,"{0} does not define a {1}.json".format(k,f_type))
     return objects
@@ -195,7 +195,7 @@ if __name__ == "__main__":
         sys.exit(1)
     jsons = json_formatted(files)
     pairs = pair(jsons)
-    for k,v in pairs.iteritems():
+    for k,v in pairs.items():
        if "job-spec" in v:
            check_spec(k,v["job-spec"])
            check_to(k,v["job-spec"])
