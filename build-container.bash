@@ -97,7 +97,8 @@ do
         if [[ ! -z "$PREV_ID" ]]
         then
             echo "[CI] Removing current image for ${PRODUCT}: ${PREV_ID}"
-            docker rmi -f ${PREV_ID}
+            docker system prune -f
+            docker rmi -f $(docker images | grep $PREV_ID | awk '{print $1":"$2}')
         fi
         #Build container
         echo "[CI] Build for: ${PRODUCT} and file ${NAME}"
