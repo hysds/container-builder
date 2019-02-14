@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import print_function
+
 import os
 import sys
 import json
@@ -33,7 +33,8 @@ def add_hysds_io(rest_url, metadata):
 def usage_and_exit():
     """Prints usage and exit"""
 
-    print("Usage:\n\t{0} <hysds-io> <job-spec> <version> <mozart_rest_url> <grq_rest_url>".format(sys.argv[0]), file=sys.stderr)
+    print("Usage:\n\t{0} <hysds-io> <job-spec> <version> <mozart_rest_url> <grq_rest_url>".format(
+        sys.argv[0]), file=sys.stderr)
     sys.exit(-1)
 
 
@@ -60,7 +61,8 @@ if __name__ == "__main__":
         "resource": "hysds-io-specification"
     }
     if not utils.check_exists(job_spec, mozart_rest_url):
-        print("[ERROR] Job Specification, {0}, does not exist. Cannot create HySDS-IO.".format(job_spec), file=sys.stderr)
+        print("[ERROR] Job Specification, {0}, does not exist. Cannot create HySDS-IO.".format(
+            job_spec), file=sys.stderr)
         sys.exit(-2)
 
     # Read specification metadata and merge it
