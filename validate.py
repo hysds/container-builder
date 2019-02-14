@@ -192,14 +192,14 @@ def pair(jsons):
     '''
     objects = {}
     reg = re.compile("^.*/(.*)\.json\.?(.*)$")
-    for k, v in jsons.items():
+    for k, v in list(jsons.items()):
         match = reg.match(k)
         name = match.group(2)
         f_type = match.group(1)
         if not name in objects:
             objects[name] = {}
         objects[name][f_type] = v
-    for k, v in objects.items():
+    for k, v in list(objects.items()):
         for f_type in ["hysds-io", "job-spec"]:
             check_true(f_type in v, False,
                        "{0} does not define a {1}.json".format(k, f_type))
@@ -244,7 +244,7 @@ if __name__ == "__main__":
         sys.exit(1)
     jsons = json_formatted(files)
     pairs = pair(jsons)
-    for k, v in pairs.items():
+    for k, v in list(pairs.items()):
         if "job-spec" in v:
             check_spec(k, v["job-spec"])
             check_to(k, v["job-spec"])
