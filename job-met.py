@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import print_function
+
 import sys
 import json
 import os
@@ -12,7 +12,8 @@ def usage_and_exit():
     '''
     Prints usage and exit
     '''
-    print("Usage:\n\t{0} <job-spec> <container> <version>".format(sys.argv[0]), file=sys.stderr)
+    print(
+        "Usage:\n\t{0} <job-spec> <container> <version>".format(sys.argv[0]), file=sys.stderr)
     sys.exit(-1)
 
 
@@ -32,7 +33,8 @@ if __name__ == "__main__":
         "resource": "jobspec"
     }
     if not utils.check_exists(container, mozart_rest_url):
-        print("[ERROR] Container, {0}, does not exist. Cannot create HySDS-IO.".format(container), file=sys.stderr)
+        print("[ERROR] Container, {0}, does not exist. Cannot create HySDS-IO.".format(
+            container), file=sys.stderr)
         sys.exit(-2)
     # Read specification metadata and merge it
     with open(specification, "r") as fp:
