@@ -156,7 +156,7 @@ do
         cont=${containers[${REPO}]}
     fi
     echo "Running Job-Met on: ${cont} docker/${specification} ${TAG} ${PRODUCT}"
-    ${DIR}/job-met.py docker/${specification} ${cont} ${TAG} ${MOZART_REST_URL}
+    ${DIR}/job-met.py docker/${specification} ${cont} ${TAG} ${MOZART_REST_URL} ${STORAGE}
     if (( $? != 0 ))
     then
         echo "[ERROR] Failed to create metadata and ingest job-spec for: ${PRODUCT}" 1>&2
