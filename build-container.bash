@@ -1,5 +1,5 @@
 #!/bin/bash
-if (( $# < 5 ))
+if (( $# < 6 ))
 then
     echo "[ERROR] Build script requires REPO and TAG"
     exit 1
@@ -11,11 +11,9 @@ TAG="${2}"
 STORAGE="${3}"
 MOZART_REST_URL="${4}"
 GRQ_REST_URL="${5}"
-shift
-shift
-shift
-shift
-shift
+SKIP_PUBLISH="${6}"
+shift 6
+
 
 #An array to map containers to annotations
 declare -A containers
@@ -110,20 +108,28 @@ do
             echo "[ERROR] Failed to build docker container for: ${PRODUCT}" 1>&2
             exit 4
         fi
-        #Save out the docker image
-        docker save -o ./${TAR} ${PRODUCT}
-        if (( $? != 0 ))
-        then
-            echo "[ERROR] Failed to save docker container for: ${PRODUCT}" 1>&2
-            exit 5
+        
+        #HC-70 Start here
+        if [ "$SKIP_PUBLISH" != "skip" ];then
+            #Save out the docker image
+            docker save -o ./${TAR} ${PRODUCT}
+            if (( $? != 0 ))
+            then
+                echo "[ERROR] Failed to save docker container for: ${PRODUCT}" 1>&2
+                exit 5
+            fi
+            #GZIP it
+            pigz -f ./${TAR}
+            if (( $? != 0 ))
+            then
+                echo "[ERROR] Failed to GZIP container for: ${PRODUCT}" 1>&2
+                exit 6
+            fi
+        else
+            echo "Skip publishing"
         fi
-        #GZIP it
-        pigz -f ./${TAR}
-        if (( $? != 0 ))
-        then
-            echo "[ERROR] Failed to GZIP container for: ${PRODUCT}" 1>&2
-            exit 6
-        fi
+        #HC-70  end here
+
         # get image digest (sha256)
         digest=$(docker inspect --format='{{index .Id}}' ${PRODUCT} | cut -d'@' -f 2)
         ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
@@ -134,8 +140,11 @@ do
         fi
     fi
     containers[${NAME}]=${PRODUCT}
-    #Attempt to remove dataset
-    rm -f ${GZ}
+    #HC-70 change
+    if [ "$SKIP_PUBLISH" != "skip" ];then
+        #Attempt to remove dataset
+        rm -f ${GZ}
+    fi
 done
 #Loop across job specification
 for specification in docker/job-spec.json*
