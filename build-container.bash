@@ -60,7 +60,7 @@ then
 fi
 
 #Run the validation script here
-${DIR}/validate.py docker/
+${DIR}/../hysds_commons/hysds_commons/validate.py docker/
 if (( $? != 0 ))
 then
     echo "[ERROR] Failed to validate hysds-io and job-spec JSON files under ${REPO}/docker. Cannot continue."
