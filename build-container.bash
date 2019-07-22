@@ -121,7 +121,7 @@ do
         fi
 
         #If CONTAINER_REGISTRY is defined, push to registry. Otherwise, gzip it.
-        if [[ -z "$CONTAINER_REGISTRY" ]]
+        if [[ ! -z "$CONTAINER_REGISTRY" ]]
         then
           echo "[CI] Pushing docker container ${PRODUCT} to ${CONTAINER_REGISTRY}"
           docker tag ${PRODUCT} ${CONTAINER_REGISTRY}/${PRODUCT}
