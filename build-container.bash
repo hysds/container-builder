@@ -11,6 +11,8 @@ TAG="${2}"
 STORAGE="${3}"
 MOZART_REST_URL="${4}"
 GRQ_REST_URL="${5}"
+CONTAINER_REGISTRY="${6}"
+shift
 shift
 shift
 shift
@@ -110,20 +112,30 @@ do
             echo "[ERROR] Failed to build docker container for: ${PRODUCT}" 1>&2
             exit 4
         fi
-        #Save out the docker image
-        docker save -o ./${TAR} ${PRODUCT}
+          #Save out the docker image
+          docker save -o ./${TAR} ${PRODUCT}
         if (( $? != 0 ))
         then
             echo "[ERROR] Failed to save docker container for: ${PRODUCT}" 1>&2
             exit 5
         fi
+
+        #If CONTAINER_REGISTRY is defined, push to registry. Otherwise, gzip it.
+        if [[ ! -z "$CONTAINER_REGISTRY" ]]
+        then
+          echo "[CI] Pushing docker container ${PRODUCT} to ${CONTAINER_REGISTRY}"
+          docker tag ${PRODUCT} ${CONTAINER_REGISTRY}/${PRODUCT}
+          docker push ${CONTAINER_REGISTRY}/${PRODUCT}
+        fi
+
         #GZIP it
         pigz -f ./${TAR}
         if (( $? != 0 ))
         then
-            echo "[ERROR] Failed to GZIP container for: ${PRODUCT}" 1>&2
-            exit 6
+          echo "[ERROR] Failed to GZIP container for: ${PRODUCT}" 1>&2
+          exit 6
         fi
+        
         # get image digest (sha256)
         digest=$(docker inspect --format='{{index .Id}}' ${PRODUCT} | cut -d'@' -f 2)
         ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
