@@ -12,8 +12,14 @@ STORAGE="${3}"
 MOZART_REST_URL="${4}"
 GRQ_REST_URL="${5}"
 SKIP_PUBLISH="${6}"
-shift 6
-
+CONTAINER_REGISTRY="${7}"
+shift
+shift
+shift
+shift
+shift
+shift
+shift
 
 #An array to map containers to annotations
 declare -A containers
@@ -58,7 +64,7 @@ then
 fi
 
 #Run the validation script here
-${DIR}/validate.py docker/
+${DIR}/../hysds_commons/hysds_commons/validate.py docker/
 if (( $? != 0 ))
 then
     echo "[ERROR] Failed to validate hysds-io and job-spec JSON files under ${REPO}/docker. Cannot continue."
@@ -109,7 +115,6 @@ do
             exit 4
         fi
         
-        #HC-70 Start here
         if [ "$SKIP_PUBLISH" != "skip" ];then
             #Save out the docker image
             docker save -o ./${TAR} ${PRODUCT}
@@ -117,6 +122,13 @@ do
             then
                 echo "[ERROR] Failed to save docker container for: ${PRODUCT}" 1>&2
                 exit 5
+            fi
+             #If CONTAINER_REGISTRY is defined, push to registry. Otherwise, gzip it.
+            if [[ ! -z "$CONTAINER_REGISTRY" ]]
+            then
+                echo "[CI] Pushing docker container ${PRODUCT} to ${CONTAINER_REGISTRY}"
+                docker tag ${PRODUCT} ${CONTAINER_REGISTRY}/${PRODUCT}
+                docker push ${CONTAINER_REGISTRY}/${PRODUCT}
             fi
             #GZIP it
             pigz -f ./${TAR}
@@ -128,7 +140,6 @@ do
         else
             echo "Skip publishing"
         fi
-        #HC-70  end here
 
         # get image digest (sha256)
         digest=$(docker inspect --format='{{index .Id}}' ${PRODUCT} | cut -d'@' -f 2)
