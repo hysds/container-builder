@@ -17,6 +17,8 @@ shift
 shift
 shift
 
+COLON=":"
+
 #An array to map containers to annotations
 declare -A containers
 declare -A specs
@@ -79,12 +81,15 @@ fi
 for dockerfile in docker/Dockerfile*
 do
     dockerfile=${dockerfile#docker/}
+    echo "dockerfile: ${dockerfile}"
     #Get the name for this container, from repo or annotation to Dockerfile
+    echo "****** REPO: $REPO"
     NAME=${REPO}
     if [[ "${dockerfile}" != "Dockerfile" ]]
     then
         NAME=${dockerfile#Dockerfile.}
     fi
+    echo "****** NAME: $NAME"
     #Setup container build items
     PRODUCT="container-${NAME}:${TAG}"
     #Docker tags must be lower case
@@ -123,18 +128,91 @@ do
             echo "[ERROR] Failed to GZIP container for: ${PRODUCT}" 1>&2
             exit 6
         fi
+
+        # in the case of singularity
+        S_IMG_DIR="/data/data/singularity/simg"
+        S_SANDBOX_DIR="/data/data/singularity/sandbox"
+        # clean up image directory
+        sudo rm -f ${S_IMG_DIR}/*.simg*
+        echo "[CI] Build singularity image for ${PRODUCT}"
+        SINGULARITY_OPTIONS="-v /var/run/docker.sock:/var/run/docker.sock --privileged -t --rm -v ${S_IMG_DIR}:/output"
+        ### echo ${SINGULARITY_OPTIONS}
+        docker run ${SINGULARITY_OPTIONS} singularityware/docker2singularity ${PRODUCT}
+
+        echo "[CI] Convert singularity image into sandbox"
+        sudo rm -rf ${S_SANDBOX_DIR}/*simg*
+        for simg_file in ${S_IMG_DIR}/*.simg # there is only one simg; this for loop is just for getting its name
+        do
+          simg_file=${simg_file#${S_IMG_DIR}/}
+          echo "S_SANDBOX_DIR: ${S_SANDBOX_DIR}"
+          echo "simg_file: ${simg_file}"
+          echo "S_IMG_DIR ${S_IMG_DIR}"
+          echo "S_PRODUCT: ${S_PRODUCT}"
+          echo "command: singularity build --sandbox ${S_SANDBOX_DIR}/${simg_file} ${S_IMG_DIR}/${simg_file}"
+          singularity build --sandbox ${S_SANDBOX_DIR}/${simg_file} ${S_IMG_DIR}/${simg_file}
+
+          # singularity build creates some files that are not writable by user, which is problematic
+          echo "[CI] chmod -R u+w ${S_SANDBOX_DIR}/${simg_file}"
+          chmod -R u+w ${S_SANDBOX_DIR}/${simg_file}
+
+          echo "[CI] GZIP singularity sandbox"
+          S_GZ="${simg_file}.tar.gz"
+          ### tar cf - ${S_SANDBOX_DIR}/${simg_file} | pigz > ./${S_GZ}
+          PWD1=$PWD
+          echo "PWD1: ${PWD1}"
+          cd ${S_SANDBOX_DIR}
+          tar cf - ${simg_file} | pigz > ${PWD1}/${S_GZ}
+          cd ${PWD1}
+        done
+
         # get image digest (sha256)
         digest=$(docker inspect --format='{{index .Id}}' ${PRODUCT} | cut -d'@' -f 2)
-        ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
+        ### ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
+        ${DIR}/container-met.py ${PRODUCT} ${TAG} ${S_GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
+        if (( $? != 0 ))
+        then
+            echo "[ERROR] Failed to make metadata and store container for: ${PRODUCT}" 1>&2
+            exit 7
+        fi
+        # get image digest (sha256) for singularity sandbox tar ball
+        ### S_TAG="${TAG}:simg"
+        if [ "${TAG#*$COLON}" = "$TAG" ]; then  # does not contain ":"
+          ### S_TAG="${TAG}_singularity"
+          S_TAG="singularity_${TAG}"
+        else  # contains ":"
+          S_TAG="${TAG/$COLON/_singularity$COLON}"
+        fi
+
+        ### S_PRODUCT="${PRODUCT}:simg"
+        if [ "${PRODUCT#*$COLON}" = "$PRODUCT" ]; then  # does not contain ":"
+          S_PRODUCT="${PRODUCT}_singularity"
+        else  # contains ":"
+          S_PRODUCT="${PRODUCT/$COLON/_singularity$COLON}"
+        fi
+
+        echo "before calling container-met.py"
+        echo "S_PRODUCT: ${S_PRODUCT}"
+        echo "S_TAG: ${S_TAG}"
+        echo "S_GZ: ${S_GZ}"
+        echo "STORAGE: ${STORAGE}"
+        echo "digest: ${digest}"
+        echo "MOZART_REST_URL: ${MOZART_REST_URL}"
+
+        ${DIR}/container-met.py ${S_PRODUCT} ${S_TAG} ${S_GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
         if (( $? != 0 ))
         then
             echo "[ERROR] Failed to make metadata and store container for: ${PRODUCT}" 1>&2
             exit 7
         fi
     fi
+    echo "****** NAME: $NAME"
+    echo "****** PRODUCT: $PRODUCT"
     containers[${NAME}]=${PRODUCT}
+    echo "****** containers[NAME]: ${containers[${NAME}]}"
     #Attempt to remove dataset
     rm -f ${GZ}
+    ### rm -f ${S_SANDBOX_DIR}/${simg_file}
+    ### rm -f ./${S_GZ}
 done
 #Loop across job specification
 for specification in docker/job-spec.json*
@@ -154,8 +232,37 @@ do
     then
         cont=${containers[${REPO}]}
     fi
+
+    echo "****** cont: $cont"
+    ### s_cont="${containers[${NAME}]}:simg"
+    if [ "${cont#*$COLON}" = "$cont" ]; then  # does not contain ":"
+      s_cont="${cont}_singularity"
+    else  # contains ":"
+      s_cont="${cont/$COLON/_singularity$COLON}"
+    fi
+    echo "****** s_cont: $s_cont"
+
     echo "Running Job-Met on: ${cont} docker/${specification} ${TAG} ${PRODUCT}"
     ${DIR}/job-met.py docker/${specification} ${cont} ${TAG} ${MOZART_REST_URL}
+    if (( $? != 0 ))
+    then
+        echo "[ERROR] Failed to create metadata and ingest job-spec for: ${PRODUCT}" 1>&2
+        exit 3
+    fi
+    ### S_TAG="${TAG}:simg"
+    if [ "${TAG#*$COLON}" = "$TAG" ]; then  # does not contain ":"
+      ### S_TAG="${TAG}_singularity"
+      S_TAG="singularity_${TAG}"
+    else  # contains ":"
+      S_TAG="${TAG/$COLON/_singularity$COLON}"
+    fi
+    echo "****** before calling job-met ******"
+    echo "specification: ${specification}"
+    echo "s_cont: ${s_cont}"
+    echo "S_TAG: ${S_TAG}"
+    echo "MOZART_REST_URL: ${MOZART_REST_URL}"
+    echo "Running Job-Met on: ${s_cont} docker/${specification} ${S_TAG} ${PRODUCT}"
+    ${DIR}/job-met.py docker/${specification} ${s_cont} ${S_TAG} ${MOZART_REST_URL}
     if (( $? != 0 ))
     then
         echo "[ERROR] Failed to create metadata and ingest job-spec for: ${PRODUCT}" 1>&2
@@ -188,6 +295,12 @@ do
     fi
     echo "Running IO-Met on: ${cont} docker/${wiring} ${TAG} ${PRODUCT}"
     ${DIR}/io-met.py docker/${wiring} ${spec} ${TAG} ${MOZART_REST_URL} ${GRQ_REST_URL}
+    if (( $? != 0 ))
+    then
+        echo "[ERROR] Failed to create metadata and ingest hysds-io for: ${PRODUCT}" 1>&2
+        exit 3
+    fi
+    ${DIR}/io-met.py docker/${wiring} ${spec} ${S_TAG} ${MOZART_REST_URL} ${GRQ_REST_URL}
     if (( $? != 0 ))
     then
         echo "[ERROR] Failed to create metadata and ingest hysds-io for: ${PRODUCT}" 1>&2
