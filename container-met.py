@@ -39,7 +39,8 @@ if __name__ == "__main__":
     #     mozart_rest_url, "container/add"), data=metadata, verify=False)
 
     headers = {"Content-Type": "application/json"}
-    r = requests.post(url, data=metadata, verify=True)
+    add_container_url = os.path.join(mozart_rest_url, "container/add")
+    r = requests.post(add_container_url, data=metadata, verify=True)
     r.raise_for_status()
 
     sys.exit(0)
