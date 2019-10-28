@@ -4,7 +4,9 @@ import sys
 import json
 import os
 import osaka.main
-import hysds_commons.request_utils
+
+import requests
+# import hysds_commons.request_utils
 
 
 if __name__ == "__main__":
@@ -33,7 +35,11 @@ if __name__ == "__main__":
         "digest": digest
     }
 
-    hysds_commons.request_utils.requests_json_response("POST", os.path.join(
-        mozart_rest_url, "container/add"), data=metadata, verify=False)
+    # hysds_commons.request_utils.requests_json_response("POST", os.path.join(
+    #     mozart_rest_url, "container/add"), data=metadata, verify=False)
+
+    headers = {"Content-Type": "application/json"}
+    r = requests.post(url, data=metadata, verify=True)
+    r.raise_for_status()
 
     sys.exit(0)
