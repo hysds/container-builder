@@ -56,8 +56,7 @@ def check_exists(item, rest_url):
     url = os.path.join(rest_url, "{0}/{1}?id={2}".format(ptype,
                                                          "info" if item.startswith("container") else "type", item))
     try:
-        hysds_commons.request_utils.requests_json_response(
-            "GET", url, verify=False)
+        hysds_commons.request_utils.requests_json_response("GET", url, verify=False)
         return True
     except Exception as e:
         print("Failed to find {0} because of {1}.{2}".format(item, type(e), e))

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-
 import os
 import sys
 import json
@@ -68,9 +67,11 @@ if __name__ == "__main__":
     # Read specification metadata and merge it
     with open(specification, "r") as fp:
         metadata.update(json.load(fp))
+
     metadata["id"] = product
     if metadata.get("component", "tosca") in ("mozart", "figaro"):
         add_hysds_io(mozart_rest_url, metadata)
     else:
         add_hysds_io(grq_rest_url, metadata)
+
     sys.exit(0)

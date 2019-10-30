@@ -4,6 +4,7 @@ import sys
 import json
 import os
 import osaka.main
+
 import hysds_commons.request_utils
 
 
@@ -19,11 +20,22 @@ if __name__ == "__main__":
     repo = sys.argv[4]
     digest = sys.argv[5]
     mozart_rest_url = sys.argv[6]
+
     url = os.path.join(repo, os.path.basename(product))
+
     # OSAKA call goes here
     osaka.main.put("./"+product, url)
-    metadata = {"name": ident, "version": version,
-                "url": url, "resource": "container", "digest": digest}
+
+    metadata = {
+        "name": ident,
+        "version": version,
+        "url": url,
+        "resource": "container",
+        "digest": digest
+    }
+
+    # headers = {"Content-Type": "application/json"}
     hysds_commons.request_utils.requests_json_response("POST", os.path.join(
         mozart_rest_url, "container/add"), data=metadata, verify=False)
+
     sys.exit(0)
