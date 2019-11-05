@@ -1,5 +1,5 @@
 #!/bin/bash
-if (( $# < 5 ))
+if (( $# < 6 ))
 then
     echo "[ERROR] Build script requires REPO and TAG"
     exit 1
@@ -11,13 +11,15 @@ TAG="${2}"
 STORAGE="${3}"
 MOZART_REST_URL="${4}"
 GRQ_REST_URL="${5}"
+SKIP_PUBLISH="${6}"
+CONTAINER_REGISTRY="${7}"
 shift
 shift
 shift
 shift
 shift
-
-COLON=":"
+shift
+shift
 
 #An array to map containers to annotations
 declare -A containers
@@ -62,7 +64,7 @@ then
 fi
 
 #Run the validation script here
-${DIR}/validate.py docker/
+${DIR}/../hysds_commons/hysds_commons/validate.py docker/
 if (( $? != 0 ))
 then
     echo "[ERROR] Failed to validate hysds-io and job-spec JSON files under ${REPO}/docker. Cannot continue."
@@ -81,15 +83,12 @@ fi
 for dockerfile in docker/Dockerfile*
 do
     dockerfile=${dockerfile#docker/}
-    echo "dockerfile: ${dockerfile}"
     #Get the name for this container, from repo or annotation to Dockerfile
-    echo "****** REPO: $REPO"
     NAME=${REPO}
     if [[ "${dockerfile}" != "Dockerfile" ]]
     then
         NAME=${dockerfile#Dockerfile.}
     fi
-    echo "****** NAME: $NAME"
     #Setup container build items
     PRODUCT="container-${NAME}:${TAG}"
     #Docker tags must be lower case
@@ -102,7 +101,8 @@ do
         if [[ ! -z "$PREV_ID" ]]
         then
             echo "[CI] Removing current image for ${PRODUCT}: ${PREV_ID}"
-            docker rmi -f ${PREV_ID}
+            docker system prune -f
+            docker rmi -f $(docker images | grep $PREV_ID | awk '{print $1":"$2}')
         fi
         #Build container
         echo "[CI] Build for: ${PRODUCT} and file ${NAME}"
@@ -114,26 +114,40 @@ do
             echo "[ERROR] Failed to build docker container for: ${PRODUCT}" 1>&2
             exit 4
         fi
-        #Save out the docker image
-        docker save -o ./${TAR} ${PRODUCT}
-        if (( $? != 0 ))
-        then
-            echo "[ERROR] Failed to save docker container for: ${PRODUCT}" 1>&2
-            exit 5
-        fi
-        #GZIP it
-        pigz -f ./${TAR}
-        if (( $? != 0 ))
-        then
-            echo "[ERROR] Failed to GZIP container for: ${PRODUCT}" 1>&2
-            exit 6
+        
+        if [ "$SKIP_PUBLISH" != "skip" ];then
+            #Save out the docker image
+            docker save -o ./${TAR} ${PRODUCT}
+            if (( $? != 0 ))
+            then
+                echo "[ERROR] Failed to save docker container for: ${PRODUCT}" 1>&2
+                exit 5
+            fi
+             #If CONTAINER_REGISTRY is defined, push to registry. Otherwise, gzip it.
+            # if [[ ! -z "$CONTAINER_REGISTRY" ]]
+            # then
+            #     echo "[CI] Pushing docker container ${PRODUCT} to ${CONTAINER_REGISTRY}"
+            #     docker tag ${PRODUCT} ${CONTAINER_REGISTRY}/${PRODUCT}
+            #     docker push ${CONTAINER_REGISTRY}/${PRODUCT}
+            # fi
+            #GZIP it
+            pigz -f ./${TAR}
+            if (( $? != 0 ))
+            then
+                echo "[ERROR] Failed to GZIP container for: ${PRODUCT}" 1>&2
+                exit 6
+            fi
+        else
+            echo "Skip publishing"
         fi
 
+
         # in the case of singularity
+        # to do: mkdir of these if not exist and chown to ops:ops (sudo chown -R ops:ops /data)
         S_IMG_DIR="/data/data/singularity/simg"
         S_SANDBOX_DIR="/data/data/singularity/sandbox"
         # clean up image directory
-        sudo rm -f ${S_IMG_DIR}/*.simg*
+        sudo rm -f ${S_IMG_DIR}/container*.simg
         echo "[CI] Build singularity image for ${PRODUCT}"
         SINGULARITY_OPTIONS="-v /var/run/docker.sock:/var/run/docker.sock --privileged -t --rm -v ${S_IMG_DIR}:/output"
         ### echo ${SINGULARITY_OPTIONS}
@@ -165,15 +179,18 @@ do
           cd ${PWD1}
         done
 
+
         # get image digest (sha256)
         digest=$(docker inspect --format='{{index .Id}}' ${PRODUCT} | cut -d'@' -f 2)
-        ### ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
-        ${DIR}/container-met.py ${PRODUCT} ${TAG} ${S_GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
+
+        ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
         if (( $? != 0 ))
         then
-            echo "[ERROR] Failed to make metadata and store container for: ${PRODUCT}" 1>&2
-            exit 7
+           echo "[ERROR] Failed to make metadata and store container for: ${PRODUCT}" 1>&2
+           exit 7
         fi
+
+
         # get image digest (sha256) for singularity sandbox tar ball
         ### S_TAG="${TAG}:simg"
         if [ "${TAG#*$COLON}" = "$TAG" ]; then  # does not contain ":"
@@ -202,18 +219,26 @@ do
         if (( $? != 0 ))
         then
             echo "[ERROR] Failed to make metadata and store container for: ${PRODUCT}" 1>&2
-            exit 7
+            exit 8
         fi
     fi
+
     echo "****** NAME: $NAME"
-    echo "****** PRODUCT: $PRODUCT"
+    echo "****** S_PRODUCT: $S_PRODUCT"
     containers[${NAME}]=${PRODUCT}
-    echo "****** containers[NAME]: ${containers[${NAME}]}"
-    #Attempt to remove dataset
-    rm -f ${GZ}
-    ### rm -f ${S_SANDBOX_DIR}/${simg_file}
-    ### rm -f ./${S_GZ}
+    containers["${NAME}_singularity"]=${S_PRODUCT}
+    echo "****** containers[${NAME}]: ${containers[${NAME}]}"
+    echo "****** containers["${NAME}_singularity"]: ${containers["${NAME}_singularity"]}"
+    #HC-70 change
+    if [ "$SKIP_PUBLISH" != "skip" ];then
+        #Attempt to remove dataset
+        rm -f ${GZ}
+        rm -rf ${S_SANDBOX_DIR}/${simg_file}
+        rm -f ${S_GZ}
+    fi
 done
+
+
 #Loop across job specification
 for specification in docker/job-spec.json*
 do
@@ -232,43 +257,39 @@ do
     then
         cont=${containers[${REPO}]}
     fi
-
     echo "****** cont: $cont"
-    ### s_cont="${containers[${NAME}]}:simg"
-    if [ "${cont#*$COLON}" = "$cont" ]; then  # does not contain ":"
-      s_cont="${cont}_singularity"
-    else  # contains ":"
-      s_cont="${cont/$COLON/_singularity$COLON}"
+
+    s_cont=${containers["${NAME}_singularity"]}
+    if [ -z "${s_cont}" ]
+    then
+        s_cont=${containers["${REPO}_singularity"]}
     fi
     echo "****** s_cont: $s_cont"
 
     echo "Running Job-Met on: ${cont} docker/${specification} ${TAG} ${PRODUCT}"
-    ${DIR}/job-met.py docker/${specification} ${cont} ${TAG} ${MOZART_REST_URL}
+    ### ${DIR}/job-met.py docker/${specification} ${cont} ${TAG} ${MOZART_REST_URL} ${STORAGE}
+    ${DIR}/job-met.py docker/${specification} ${s_cont} ${TAG} ${MOZART_REST_URL} ${STORAGE}
     if (( $? != 0 ))
     then
         echo "[ERROR] Failed to create metadata and ingest job-spec for: ${PRODUCT}" 1>&2
         exit 3
     fi
-    ### S_TAG="${TAG}:simg"
-    if [ "${TAG#*$COLON}" = "$TAG" ]; then  # does not contain ":"
-      ### S_TAG="${TAG}_singularity"
-      S_TAG="singularity_${TAG}"
-    else  # contains ":"
-      S_TAG="${TAG/$COLON/_singularity$COLON}"
-    fi
+
     echo "****** before calling job-met ******"
     echo "specification: ${specification}"
     echo "s_cont: ${s_cont}"
     echo "S_TAG: ${S_TAG}"
     echo "MOZART_REST_URL: ${MOZART_REST_URL}"
     echo "Running Job-Met on: ${s_cont} docker/${specification} ${S_TAG} ${PRODUCT}"
-    ${DIR}/job-met.py docker/${specification} ${s_cont} ${S_TAG} ${MOZART_REST_URL}
+    ${DIR}/job-met.py docker/${specification} ${s_cont} ${S_TAG} ${MOZART_REST_URL} ${STORAGE}
     if (( $? != 0 ))
     then
         echo "[ERROR] Failed to create metadata and ingest job-spec for: ${PRODUCT}" 1>&2
         exit 3
     fi
+
     specs[${NAME}]=${PRODUCT}
+    specs["${NAME}_singularity"]=${S_PRODUCT}
 done
 #Loop across job specification
 let iocnt=`ls docker/hysds-io.json* | wc -l`
@@ -293,18 +314,22 @@ do
     then
         spec=${specs[${REPO}]}
     fi
+
     echo "Running IO-Met on: ${cont} docker/${wiring} ${TAG} ${PRODUCT}"
     ${DIR}/io-met.py docker/${wiring} ${spec} ${TAG} ${MOZART_REST_URL} ${GRQ_REST_URL}
     if (( $? != 0 ))
     then
-        echo "[ERROR] Failed to create metadata and ingest hysds-io for: ${PRODUCT}" 1>&2
-        exit 3
+       echo "[ERROR] Failed to create metadata and ingest hysds-io for: ${PRODUCT}" 1>&2
+       exit 3
     fi
+
+    echo "Running IO-Met on: ${cont} docker/${wiring} ${S_TAG} ${PRODUCT}"
     ${DIR}/io-met.py docker/${wiring} ${spec} ${S_TAG} ${MOZART_REST_URL} ${GRQ_REST_URL}
     if (( $? != 0 ))
     then
         echo "[ERROR] Failed to create metadata and ingest hysds-io for: ${PRODUCT}" 1>&2
         exit 3
     fi
+
 done
 exit 0
