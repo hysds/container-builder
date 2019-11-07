@@ -21,6 +21,8 @@ shift
 shift
 shift
 
+COLON=":"
+
 #An array to map containers to annotations
 declare -A containers
 declare -A specs
@@ -123,7 +125,7 @@ do
                 echo "[ERROR] Failed to save docker container for: ${PRODUCT}" 1>&2
                 exit 5
             fi
-             #If CONTAINER_REGISTRY is defined, push to registry. Otherwise, gzip it.
+            #If CONTAINER_REGISTRY is defined, push to registry. Otherwise, gzip it.
             # if [[ ! -z "$CONTAINER_REGISTRY" ]]
             # then
             #     echo "[CI] Pushing docker container ${PRODUCT} to ${CONTAINER_REGISTRY}"
@@ -192,22 +194,21 @@ do
 
 
         # get image digest (sha256) for singularity sandbox tar ball
-        ### S_TAG="${TAG}:simg"
-        if [ "${TAG#*$COLON}" = "$TAG" ]; then  # does not contain ":"
-          ### S_TAG="${TAG}_singularity"
-          S_TAG="singularity_${TAG}"
-        else  # contains ":"
-          S_TAG="${TAG/$COLON/_singularity$COLON}"
-        fi
+        S_TAG="${TAG}_singularity"
+        ### if [ "${TAG#*$COLON}" = "$TAG" ]; then  # does not contain ":"
+        ###   S_TAG="singularity_${TAG}"
+        ### else  # contains ":"
+        ###   S_TAG="${TAG/$COLON/_singularity$COLON}"
+        ### fi
 
-        ### S_PRODUCT="${PRODUCT}:simg"
-        if [ "${PRODUCT#*$COLON}" = "$PRODUCT" ]; then  # does not contain ":"
-          S_PRODUCT="${PRODUCT}_singularity"
-        else  # contains ":"
-          S_PRODUCT="${PRODUCT/$COLON/_singularity$COLON}"
-        fi
+        S_PRODUCT="${PRODUCT}_singularity"
+        ### if [ "${PRODUCT#*$COLON}" = "$PRODUCT" ]; then  # does not contain ":"
+        ###   S_PRODUCT="${PRODUCT}_singularity"
+        ### else  # contains ":"
+        ###   S_PRODUCT="${PRODUCT/$COLON/_singularity$COLON}"
+        ### fi
 
-        echo "before calling container-met.py"
+        echo "before calling container-met.py for singularity"
         echo "S_PRODUCT: ${S_PRODUCT}"
         echo "S_TAG: ${S_TAG}"
         echo "S_GZ: ${S_GZ}"
@@ -266,22 +267,25 @@ do
     fi
     echo "****** s_cont: $s_cont"
 
-    echo "Running Job-Met on: ${cont} docker/${specification} ${TAG} ${PRODUCT}"
+    # do not create the docker job
+    ### echo "Running Job-Met on: ${cont} docker/${specification} ${TAG} ${PRODUCT}"
     ### ${DIR}/job-met.py docker/${specification} ${cont} ${TAG} ${MOZART_REST_URL} ${STORAGE}
-    ${DIR}/job-met.py docker/${specification} ${s_cont} ${TAG} ${MOZART_REST_URL} ${STORAGE}
-    if (( $? != 0 ))
-    then
-        echo "[ERROR] Failed to create metadata and ingest job-spec for: ${PRODUCT}" 1>&2
-        exit 3
-    fi
+    ### if (( $? != 0 ))
+    ### then
+    ###     echo "[ERROR] Failed to create metadata and ingest job-spec for: ${PRODUCT}" 1>&2
+    ###     exit 3
+    ### fi
 
-    echo "****** before calling job-met ******"
+    echo "****** before calling job-met for singularity ******"
     echo "specification: ${specification}"
     echo "s_cont: ${s_cont}"
     echo "S_TAG: ${S_TAG}"
     echo "MOZART_REST_URL: ${MOZART_REST_URL}"
     echo "Running Job-Met on: ${s_cont} docker/${specification} ${S_TAG} ${PRODUCT}"
-    ${DIR}/job-met.py docker/${specification} ${s_cont} ${S_TAG} ${MOZART_REST_URL} ${STORAGE}
+    # it seems that the ${TAG} being used here needs to be the same as job spec
+    # for the io-met.py call below to find this job
+    ### ${DIR}/job-met.py docker/${specification} ${s_cont} ${S_TAG} ${MOZART_REST_URL} ${STORAGE}
+    ${DIR}/job-met.py docker/${specification} ${s_cont} ${TAG} ${MOZART_REST_URL} ${STORAGE}
     if (( $? != 0 ))
     then
         echo "[ERROR] Failed to create metadata and ingest job-spec for: ${PRODUCT}" 1>&2
@@ -310,20 +314,33 @@ do
     PRODUCT="hysds-io-${NAME}:${TAG}"    
     echo "[CI] Build for: ${PRODUCT} and file ${NAME}"
     spec=${specs[${NAME}]}
-    if [ -z "${cont}" ]
+    if [ -z "${spec}" ]
     then
         spec=${specs[${REPO}]}
     fi
+    ### s_spec=${specs["${NAME}_singularity"]}
+    ### if [ -z "${s_spec}" ]
+    ### then
+    ###     s_spec=${specs["${REPO}_singularity"]}
+    ### fi
 
-    echo "Running IO-Met on: ${cont} docker/${wiring} ${TAG} ${PRODUCT}"
-    ${DIR}/io-met.py docker/${wiring} ${spec} ${TAG} ${MOZART_REST_URL} ${GRQ_REST_URL}
-    if (( $? != 0 ))
-    then
-       echo "[ERROR] Failed to create metadata and ingest hysds-io for: ${PRODUCT}" 1>&2
-       exit 3
-    fi
+    # do not create the docker io
+    ### echo "Running IO-Met on: ${cont} docker/${wiring} ${TAG} ${PRODUCT}"
+    ### ${DIR}/io-met.py docker/${wiring} ${spec} ${TAG} ${MOZART_REST_URL} ${GRQ_REST_URL}
+    ### if (( $? != 0 ))
+    ### then
+    ###    echo "[ERROR] Failed to create metadata and ingest hysds-io for: ${PRODUCT}" 1>&2
+    ###    exit 3
+    ### fi
 
-    echo "Running IO-Met on: ${cont} docker/${wiring} ${S_TAG} ${PRODUCT}"
+    echo "****** before calling io-met for singularity ******"
+    ### echo "s_spec: ${s_spec}"
+
+    ### echo "Running IO-Met on: ${s_spec} docker/${wiring} ${S_TAG} ${PRODUCT}"
+    # if called with s_spec, [python3_singularity] option will NOT be in the pull-down list of on-demand
+    ### ${DIR}/io-met.py docker/${wiring} ${s_spec} ${S_TAG} ${MOZART_REST_URL} ${GRQ_REST_URL}
+    # ${spec} in the io-met call needs to match with ${TAG} in the job-met call in order to find the job
+    echo "Running IO-Met on: ${spec} docker/${wiring} ${S_TAG} ${PRODUCT}"
     ${DIR}/io-met.py docker/${wiring} ${spec} ${S_TAG} ${MOZART_REST_URL} ${GRQ_REST_URL}
     if (( $? != 0 ))
     then
