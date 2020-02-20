@@ -22,8 +22,16 @@ if __name__ == "__main__":
     url = os.path.join(repo, os.path.basename(product))
     # OSAKA call goes here
     osaka.main.put("./"+product, url)
-    metadata = {"name": ident, "version": version,
-                "url": url, "resource": "container", "digest": digest}
-    hysds_commons.request_utils.requests_json_response("POST", os.path.join(
-        mozart_rest_url, "container/add"), data=metadata, verify=False)
+
+    metadata = {
+        "name": ident,
+        "version": version,
+        "url": url,
+        "resource": "container",
+        "digest": digest
+    }
+
+    add_container_endpoint = os.path.join(mozart_rest_url, "container/add")
+    hysds_commons.request_utils.requests_json_response("POST", add_container_endpoint, data=metadata, verify=False)
+
     sys.exit(0)
