@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-
 import sys
-import json
 import os
 import osaka.main
 import hysds_commons.request_utils
@@ -20,8 +18,9 @@ if __name__ == "__main__":
     digest = sys.argv[5]
     mozart_rest_url = sys.argv[6]
     url = os.path.join(repo, os.path.basename(product))
+
     # OSAKA call goes here
-    osaka.main.put("./"+product, url)
+    osaka.main.put("./" + product, url)
 
     metadata = {
         "name": ident,
