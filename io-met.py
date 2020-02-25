@@ -44,7 +44,6 @@ if __name__ == "__main__":
 
     if len(sys.argv) != 6:
         usage_and_exit()
-        sys.exit(-1)
 
     # Read arguments
     specification = sys.argv[1]
