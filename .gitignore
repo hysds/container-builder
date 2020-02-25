@@ -2,7 +2,6 @@
 *.pyc
 *.key
 *.pem
-
 *.pyc
 build
 *.egg-info
