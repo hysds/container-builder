@@ -9,14 +9,12 @@ from string import Template
 
 def usage_and_exit():
     """Prints usage and exit"""
-    print(
-        "Usage:\n\t{0} <job-spec> <container> <version> <storage>".format(sys.argv[0]), file=sys.stderr)
+    print("Usage:\n\t{0} <job-spec> <container> <version> <storage>".format(sys.argv[0]), file=sys.stderr)
     sys.exit(-1)
 
 
 def resolve_dependency_images(payload, storage):
     """Resolve dependency images located in the cluster's code bucket"""
-
     if storage.endswith('/'):
         storage = storage[:-1]
     dep_cfgs = payload.get('dependency_images', [])

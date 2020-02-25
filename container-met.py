@@ -2,6 +2,7 @@
 import sys
 import os
 import osaka.main
+
 import hysds_commons.request_utils
 
 
@@ -17,6 +18,7 @@ if __name__ == "__main__":
     repo = sys.argv[4]
     digest = sys.argv[5]
     mozart_rest_url = sys.argv[6]
+
     url = os.path.join(repo, os.path.basename(product))
 
     # OSAKA call goes here

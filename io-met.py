@@ -69,6 +69,7 @@ if __name__ == "__main__":
     # Read specification metadata and merge it
     with open(specification, "r") as fp:
         metadata.update(json.load(fp))
+
     metadata["id"] = product
 
     if metadata.get("component", "tosca") in ("mozart", "figaro"):
