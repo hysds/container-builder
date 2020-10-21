@@ -56,7 +56,8 @@ def check_exists(item, rest_url):
         ptype, "info" if item.startswith("container") else "type", item))
 
     try:
-        requests.get(url, verify=False)
+        r = requests.get(url, verify=False)
+        r.raise_for_status()
         return True
     except Exception as e:
         print("Failed to find {0} because of {1}.{2}".format(item, type(e), e))

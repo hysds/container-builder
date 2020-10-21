@@ -33,6 +33,7 @@ if __name__ == "__main__":
     }
 
     add_container_endpoint = os.path.join(mozart_rest_url, "container/add")
-    requests.post(add_container_endpoint, data=metadata, verify=False)
+    r = requests.post(add_container_endpoint, data=metadata, verify=False)
+    r.raise_for_status()
 
     sys.exit(0)

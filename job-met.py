@@ -56,6 +56,7 @@ if __name__ == "__main__":
 
     metadata["id"] = product
     endpoint = os.path.join(mozart_rest_url, "job_spec/add")
-    requests.post(endpoint, data={"spec": json.dumps(metadata)}, verify=False)
+    r = requests.post(endpoint, data={"spec": json.dumps(metadata)}, verify=False)
+    r.raise_for_status()
 
     sys.exit(0)

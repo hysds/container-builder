@@ -28,7 +28,8 @@ def add_hysds_io(rest_url, data):
     data = {
         "spec": json.dumps(data)
     }
-    requests.post(os.path.join(rest_url, "hysds_io/add"), data=data, verify=False)
+    r = requests.post(os.path.join(rest_url, "hysds_io/add"), data=data, verify=False)
+    r.raise_for_status()
 
 
 def usage_and_exit():
