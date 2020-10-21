@@ -2,9 +2,9 @@
 import sys
 import json
 import os
-import hysds_commons.request_utils
 import utils
 from string import Template
+import requests
 
 
 def usage_and_exit():
@@ -55,8 +55,7 @@ if __name__ == "__main__":
         metadata.update(payload)
 
     metadata["id"] = product
-
-    hysds_commons.request_utils.requests_json_response("POST", os.path.join(
-        mozart_rest_url, "job_spec/add"), data={"spec": json.dumps(metadata)}, verify=False)
+    endpoint = os.path.join(mozart_rest_url, "job_spec/add")
+    requests.post(endpoint, data={"spec": json.dumps(metadata)}, verify=False)
 
     sys.exit(0)

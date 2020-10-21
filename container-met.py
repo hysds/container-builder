@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 import sys
 import os
-import osaka.main
 
-import hysds_commons.request_utils
+import requests
+import osaka.main
 
 
 if __name__ == "__main__":
@@ -33,6 +33,6 @@ if __name__ == "__main__":
     }
 
     add_container_endpoint = os.path.join(mozart_rest_url, "container/add")
-    hysds_commons.request_utils.requests_json_response("POST", add_container_endpoint, data=metadata, verify=False)
+    requests.post(add_container_endpoint, data=metadata, verify=False)
 
     sys.exit(0)

@@ -2,8 +2,7 @@
 import os
 import sys
 import json
-
-from hysds_commons.request_utils import requests_json_response
+import requests
 import utils
 
 
@@ -18,7 +17,7 @@ def add_hysds_io(rest_url, data):
         "id": data['id']
     }
     hysds_io_endpoint = os.path.join(rest_url, "hysds_io/type")
-    doc = requests_json_response("GET", hysds_io_endpoint, data=hysds_io_obj, verify=False, ignore_errors=True)
+    doc = requests.get(hysds_io_endpoint, data=hysds_io_obj, verify=False)
 
     # copy existing allowed accounts
     if doc is not None:
@@ -29,7 +28,7 @@ def add_hysds_io(rest_url, data):
     data = {
         "spec": json.dumps(data)
     }
-    requests_json_response("POST", os.path.join(rest_url, "hysds_io/add"), data=data, verify=False)
+    requests.post(os.path.join(rest_url, "hysds_io/add"), data=data, verify=False)
 
 
 def usage_and_exit():
