@@ -17,7 +17,13 @@ def add_hysds_io(rest_url, data):
         "id": data['id']
     }
     hysds_io_endpoint = os.path.join(rest_url, "hysds_io/type")
-    doc = requests.get(hysds_io_endpoint, data=hysds_io_obj, verify=False)
+
+    try:
+        doc = requests.get(hysds_io_endpoint, data=hysds_io_obj, verify=False)
+        doc = doc.json()
+    except Exception as e:
+        doc = None
+        print(e)  # ignore errors
 
     # copy existing allowed accounts
     if doc is not None:
