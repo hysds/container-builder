@@ -19,8 +19,9 @@ def add_hysds_io(rest_url, data):
     hysds_io_endpoint = os.path.join(rest_url, "hysds_io/type")
 
     try:
-        doc = requests.get(hysds_io_endpoint, data=hysds_io_obj, verify=False)
-        doc = doc.json()
+        req = requests.get(hysds_io_endpoint, data=hysds_io_obj, verify=False)
+        req.raise_for_status()
+        doc = req.json()
     except Exception as e:
         doc = None
         print(e)  # ignore errors
