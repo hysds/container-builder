@@ -1,7 +1,7 @@
 import os
 import re
 import subprocess
-import hysds_commons.request_utils
+import requests
 
 TYPE_TAIL_RE = re.compile(".*/([^/]*).json.?(.*)")
 REPO_RE = re.compile(".*/([^/ ]+).git")
@@ -43,6 +43,7 @@ def check_exists(item, rest_url):
     """
     Checks the existence of item in ES
     @param item: item to check
+    @param rest_url: rest API endpoint
     @return: True if item exists
     """
 
@@ -51,10 +52,12 @@ def check_exists(item, rest_url):
         ptype = "job_spec"
     elif item.startswith("hysds_io"):
         ptype = "hysds_io"
-    url = os.path.join(rest_url, "{0}/{1}?id={2}".format(ptype,
-                                                         "info" if item.startswith("container") else "type", item))
+    url = os.path.join(rest_url, "{0}/{1}?id={2}".format(
+        ptype, "info" if item.startswith("container") else "type", item))
+
     try:
-        hysds_commons.request_utils.requests_json_response("GET", url, verify=False)
+        r = requests.get(url, verify=False)
+        r.raise_for_status()
         return True
     except Exception as e:
         print("Failed to find {0} because of {1}.{2}".format(item, type(e), e))
