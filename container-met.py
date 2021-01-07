@@ -22,7 +22,7 @@ if __name__ == "__main__":
     url = os.path.join(repo, os.path.basename(product))
 
     # OSAKA call goes here
-    osaka.main.put("./" + product, url)
+    osaka.main.put("./" + product, url, force=True)
 
     metadata = {
         "name": ident,
