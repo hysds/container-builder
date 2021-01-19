@@ -35,7 +35,7 @@ def get_product_id(specification, version):
     ptype = "job" if match.group(1) == "job-spec" else "hysds-io"
     name = match.group(2)
     if name == "":
-        name = get_repo(os.basename(specification))
+        name = get_repo(os.path.basename(specification))
     return "{0}-{1}:{2}".format(ptype, name, version)
 
 
