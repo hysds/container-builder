@@ -11,20 +11,23 @@ def add_hysds_io(rest_url, data):
     Index hysds-io into respective components ES preserving allowed_accounts
     if hysds-io already is registered.
     """
-
-    # get hysds-io if exists
-    hysds_io_obj = {
-        "id": data['id']
-    }
+    _id = data['id']
+    hysds_io_obj = {"id": _id}
     hysds_io_endpoint = os.path.join(rest_url, "hysds_io/type")
 
+    # check if HySDS IO if exists
+    doc = None
+    req = requests.get(hysds_io_endpoint, data=hysds_io_obj, verify=False)
     try:
-        req = requests.get(hysds_io_endpoint, data=hysds_io_obj, verify=False)
         req.raise_for_status()
         doc = req.json()
+    except requests.exceptions.HTTPError as e:
+        if req.status_code == 404:
+            print("WARNING: hysds_io not found: %s, cannot merge allowed_accounts" % _id)
+        else:
+            raise requests.exceptions.HTTPError(e)
     except Exception as e:
-        doc = None
-        print(e)  # ignore errors
+        raise Exception(e)
 
     # copy existing allowed accounts
     if doc is not None:
