@@ -5,6 +5,11 @@ import os
 import requests
 import osaka.main
 
+class CustomCipherAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        ssl_context = create_urllib3_context(ciphers="DHE-RSA-AES128-GCM-SHA256")
+        kwargs['ssl_context'] = ssl_context
+        return super(CustomCipherAdapter, self).init_poolmanager(*args, **kwargs)
 
 if __name__ == "__main__":
     if len(sys.argv) != 7:
@@ -33,7 +38,9 @@ if __name__ == "__main__":
     }
 
     add_container_endpoint = os.path.join(mozart_rest_url, "container/add")
-    r = requests.post(add_container_endpoint, data=metadata, verify=False)
+    session = requests.Session()
+    session.mount("https://", CustomCipherAdapter())
+    r = session.post(add_container_endpoint, data=metadata, verify=False)
     r.raise_for_status()
 
     sys.exit(0)
