@@ -38,7 +38,7 @@ if __name__ == "__main__":
     }
 
     add_container_endpoint = os.path.join(mozart_rest_url, "container/add")
-    os.environ['NETRC'] = os.path.expanduser("~/.netrc-os")
+
     session = requests.Session()
     session.mount("https://", CustomCipherAdapter())
     r = session.post(add_container_endpoint, data=metadata, verify=False)
