@@ -44,7 +44,7 @@ def add_hysds_io(rest_url, data):
 
 def usage_and_exit():
     """Prints usage and exit"""
-    print("Usage: {0}".format(sys.argv[0]), file=sys.stderr)
+    print(f"Usage: {sys.argv[0]}", file=sys.stderr)
     print("Arguments must be supplied: (hysds-io, job-spec, version, mozart_rest_url, grq_rest_ur)", file=sys.stderr)
     sys.exit(-1)
 
@@ -72,11 +72,11 @@ if __name__ == "__main__":
         "resource": "hysds-io-specification"
     }
     if not utils.check_exists(job_spec, mozart_rest_url):
-        print("ERROR: Job Specification {0} does not exist. Cannot create HySDS-IO.".format(job_spec), file=sys.stderr)
+        print(f"ERROR: Job Specification {job_spec} does not exist. Cannot create HySDS-IO.", file=sys.stderr)
         sys.exit(-2)
 
     # Read specification metadata and merge it
-    with open(specification, "r") as fp:
+    with open(specification) as fp:
         metadata.update(json.load(fp))
 
     metadata["id"] = product
