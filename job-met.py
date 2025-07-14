@@ -9,7 +9,7 @@ import requests
 
 def usage_and_exit():
     """Prints usage and exit"""
-    print("Usage:\n\t{0} <job-spec> <container> <version> <storage>".format(sys.argv[0]), file=sys.stderr)
+    print(f"Usage:\n\t{sys.argv[0]} <job-spec> <container> <version> <storage>", file=sys.stderr)
     sys.exit(-1)
 
 
@@ -44,12 +44,12 @@ if __name__ == "__main__":
     }
 
     if not utils.check_exists(container, mozart_rest_url):
-        print("[ERROR] Container, {0}, does not exist. Cannot create HySDS-IO.".format(
+        print("[ERROR] Container, {}, does not exist. Cannot create HySDS-IO.".format(
             container), file=sys.stderr)
         sys.exit(-2)
 
     # Read specification metadata and merge it
-    with open(specification, "r") as fp:
+    with open(specification) as fp:
         payload = json.load(fp)
         resolve_dependency_images(payload, storage)
         metadata.update(payload)
