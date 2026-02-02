@@ -140,31 +140,81 @@ do
         echo "[CI] Build for: ${PRODUCT} and file ${NAME}"
         
         if (( ${USE_BUILDX} == 1 )); then
-            # Multi-platform build using buildx
-            # Note: --load only works with single platform, so we push directly to registry
+            # Multi-platform build - build each architecture separately to create tarballs
             echo "[CI] Building multi-platform image: ${PLATFORM}"
+            echo "[CI] Will build each architecture separately to create individual tarballs"
             
-            if [[ ! -z "$CONTAINER_REGISTRY" ]]; then
-                # Push directly to registry for multi-platform
-                echo "[CI] Multi-platform build will push directly to registry: ${CONTAINER_REGISTRY}"
-                echo " docker buildx build --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${CONTAINER_REGISTRY}/${PRODUCT} ${BUILD_ARGS} --push ."
-                docker buildx build --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${CONTAINER_REGISTRY}/${PRODUCT} ${BUILD_ARGS} --push .
+            # Split platforms and build each one
+            IFS=',' read -ra PLATFORMS <<< "$PLATFORM"
+            for plat in "${PLATFORMS[@]}"; do
+                plat=$(echo "$plat" | xargs) # trim whitespace
+                echo "[CI] Building for platform: ${plat}"
+                
+                # Determine architecture suffix for tarball naming
+                ARCH_SUFFIX=""
+                if [[ "$plat" == *"arm64"* ]]; then
+                    ARCH_SUFFIX="-arm64"
+                fi
+                
+                # Build for this specific platform
+                PLATFORM_PRODUCT="${PRODUCT}${ARCH_SUFFIX}"
+                PLATFORM_TAR="${PLATFORM_PRODUCT}.tar"
+                PLATFORM_GZ="${PLATFORM_TAR}.gz"
+                
+                echo " docker buildx build --platform ${plat} --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} ${BUILD_ARGS} --load ."
+                docker buildx build --platform ${plat} --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} ${BUILD_ARGS} --load .
                 if (( $? != 0 ))
                 then
-                    echo "[ERROR] Failed to build and push multi-platform docker container for: ${PRODUCT}" 1>&2
+                    echo "[ERROR] Failed to build docker container for platform ${plat}: ${PRODUCT}" 1>&2
                     exit 4
                 fi
-                # Also tag locally (pull one platform for local use)
-                docker pull ${CONTAINER_REGISTRY}/${PRODUCT}
-                docker tag ${CONTAINER_REGISTRY}/${PRODUCT} ${PRODUCT}
-            else
-                echo "[ERROR] Multi-platform builds require CONTAINER_REGISTRY to be set for direct push" 1>&2
-                echo "[ERROR] Cannot use docker save with multi-platform images" 1>&2
-                echo "[ERROR] Please either:" 1>&2
-                echo "[ERROR]   1. Set CONTAINER_REGISTRY and use --push, or" 1>&2
-                echo "[ERROR]   2. Build single platform at a time (e.g., linux/amd64 or linux/arm64)" 1>&2
-                exit 4
+                
+                # Save this platform's image to tarball
+                if [ "$SKIP_PUBLISH" != "skip" ]; then
+                    echo "[CI] Saving ${plat} image to ${PLATFORM_TAR}"
+                    docker save -o ./${PLATFORM_TAR} ${PRODUCT}
+                    if (( $? != 0 ))
+                    then
+                        echo "[ERROR] Failed to save docker container for platform ${plat}: ${PRODUCT}" 1>&2
+                        exit 5
+                    fi
+                    
+                    # GZIP it
+                    pigz -f ./${PLATFORM_TAR}
+                    if (( $? != 0 ))
+                    then
+                        echo "[ERROR] Failed to GZIP container for platform ${plat}: ${PRODUCT}" 1>&2
+                        exit 6
+                    fi
+                    
+                    echo "[CI] Created tarball: ${PLATFORM_GZ}"
+                fi
+                
+                # Push to registry with platform-specific tag
+                if [[ ! -z "$CONTAINER_REGISTRY" ]]; then
+                    REGISTRY_TAG="${CONTAINER_REGISTRY}/${PRODUCT}${ARCH_SUFFIX}"
+                    echo "[CI] Pushing ${plat} image to registry: ${REGISTRY_TAG}"
+                    docker tag ${PRODUCT} ${REGISTRY_TAG}
+                    docker push ${REGISTRY_TAG}
+                fi
+            done
+            
+            # Now create multi-platform manifest in registry
+            if [[ ! -z "$CONTAINER_REGISTRY" ]]; then
+                echo "[CI] Creating multi-platform manifest: ${CONTAINER_REGISTRY}/${PRODUCT}"
+                MANIFEST_CMD="docker buildx build --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${CONTAINER_REGISTRY}/${PRODUCT} ${BUILD_ARGS} --push ."
+                echo " ${MANIFEST_CMD}"
+                eval ${MANIFEST_CMD}
+                if (( $? != 0 ))
+                then
+                    echo "[ERROR] Failed to create multi-platform manifest" 1>&2
+                    exit 4
+                fi
+                echo "[CI] Multi-platform manifest created successfully"
             fi
+            
+            # Skip the normal save/push logic since we handled it above
+            USE_BUILDX=2
         else
             # Single platform build using standard docker build
             echo "[CI] Building single platform image: ${PLATFORM}"
@@ -178,10 +228,9 @@ do
         fi
         
         if [ "$SKIP_PUBLISH" != "skip" ];then
-            if (( ${USE_BUILDX} == 1 )); then
-                # Multi-platform build already pushed to registry, skip docker save
-                echo "[CI] Multi-platform image already pushed to ${CONTAINER_REGISTRY}/${PRODUCT}"
-                echo "[CI] Skipping docker save and gzip for multi-platform build"
+            if (( ${USE_BUILDX} == 2 )); then
+                # Multi-platform build already created tarballs and pushed to registry
+                echo "[CI] Multi-platform build complete - tarballs and registry images created"
             else
                 #Save out the docker image
                 docker save -o ./${TAR} ${PRODUCT}
