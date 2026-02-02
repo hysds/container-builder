@@ -141,12 +141,28 @@ do
         
         if (( ${USE_BUILDX} == 1 )); then
             # Multi-platform build using buildx
+            # Note: --load only works with single platform, so we push directly to registry
             echo "[CI] Building multi-platform image: ${PLATFORM}"
-            echo " docker buildx build --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} ${BUILD_ARGS} ."
-            docker buildx build --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} ${BUILD_ARGS} --load .
-            if (( $? != 0 ))
-            then
-                echo "[ERROR] Failed to build multi-platform docker container for: ${PRODUCT}" 1>&2
+            
+            if [[ ! -z "$CONTAINER_REGISTRY" ]]; then
+                # Push directly to registry for multi-platform
+                echo "[CI] Multi-platform build will push directly to registry: ${CONTAINER_REGISTRY}"
+                echo " docker buildx build --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${CONTAINER_REGISTRY}/${PRODUCT} ${BUILD_ARGS} --push ."
+                docker buildx build --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${CONTAINER_REGISTRY}/${PRODUCT} ${BUILD_ARGS} --push .
+                if (( $? != 0 ))
+                then
+                    echo "[ERROR] Failed to build and push multi-platform docker container for: ${PRODUCT}" 1>&2
+                    exit 4
+                fi
+                # Also tag locally (pull one platform for local use)
+                docker pull ${CONTAINER_REGISTRY}/${PRODUCT}
+                docker tag ${CONTAINER_REGISTRY}/${PRODUCT} ${PRODUCT}
+            else
+                echo "[ERROR] Multi-platform builds require CONTAINER_REGISTRY to be set for direct push" 1>&2
+                echo "[ERROR] Cannot use docker save with multi-platform images" 1>&2
+                echo "[ERROR] Please either:" 1>&2
+                echo "[ERROR]   1. Set CONTAINER_REGISTRY and use --push, or" 1>&2
+                echo "[ERROR]   2. Build single platform at a time (e.g., linux/amd64 or linux/arm64)" 1>&2
                 exit 4
             fi
         else
@@ -162,26 +178,32 @@ do
         fi
         
         if [ "$SKIP_PUBLISH" != "skip" ];then
-            #Save out the docker image
-            docker save -o ./${TAR} ${PRODUCT}
-            if (( $? != 0 ))
-            then
-                echo "[ERROR] Failed to save docker container for: ${PRODUCT}" 1>&2
-                exit 5
-            fi
-             #If CONTAINER_REGISTRY is defined, push to registry. Otherwise, gzip it.
-            if [[ ! -z "$CONTAINER_REGISTRY" ]]
-            then
-                echo "[CI] Pushing docker container ${PRODUCT} to ${CONTAINER_REGISTRY}"
-                docker tag ${PRODUCT} ${CONTAINER_REGISTRY}/${PRODUCT}
-                docker push ${CONTAINER_REGISTRY}/${PRODUCT}
-            fi
-            #GZIP it
-            pigz -f ./${TAR}
-            if (( $? != 0 ))
-            then
-                echo "[ERROR] Failed to GZIP container for: ${PRODUCT}" 1>&2
-                exit 6
+            if (( ${USE_BUILDX} == 1 )); then
+                # Multi-platform build already pushed to registry, skip docker save
+                echo "[CI] Multi-platform image already pushed to ${CONTAINER_REGISTRY}/${PRODUCT}"
+                echo "[CI] Skipping docker save and gzip for multi-platform build"
+            else
+                #Save out the docker image
+                docker save -o ./${TAR} ${PRODUCT}
+                if (( $? != 0 ))
+                then
+                    echo "[ERROR] Failed to save docker container for: ${PRODUCT}" 1>&2
+                    exit 5
+                fi
+                 #If CONTAINER_REGISTRY is defined, push to registry. Otherwise, gzip it.
+                if [[ ! -z "$CONTAINER_REGISTRY" ]]
+                then
+                    echo "[CI] Pushing docker container ${PRODUCT} to ${CONTAINER_REGISTRY}"
+                    docker tag ${PRODUCT} ${CONTAINER_REGISTRY}/${PRODUCT}
+                    docker push ${CONTAINER_REGISTRY}/${PRODUCT}
+                fi
+                #GZIP it
+                pigz -f ./${TAR}
+                if (( $? != 0 ))
+                then
+                    echo "[ERROR] Failed to GZIP container for: ${PRODUCT}" 1>&2
+                    exit 6
+                fi
             fi
         else
             echo "Skip publishing"
