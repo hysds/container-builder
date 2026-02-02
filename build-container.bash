@@ -21,6 +21,38 @@ shift
 shift
 shift
 
+# Default platform (backward compatible)
+PLATFORM="linux/amd64"
+USE_BUILDX=0
+
+# Parse remaining arguments for --platform flag
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --platform)
+            PLATFORM="$2"
+            shift 2
+            ;;
+        --platform=*)
+            PLATFORM="${1#*=}"
+            shift
+            ;;
+        *)
+            # Keep other arguments for docker build
+            BUILD_ARGS="${BUILD_ARGS} $1"
+            shift
+            ;;
+    esac
+done
+
+# Check if multi-platform build is requested
+if [[ "$PLATFORM" == *","* ]]; then
+    USE_BUILDX=1
+    echo "[CI] Multi-platform build requested: ${PLATFORM}"
+    echo "[CI] Will use docker buildx for multi-platform support"
+else
+    echo "[CI] Single platform build: ${PLATFORM}"
+fi
+
 #An array to map containers to annotations
 declare -A containers
 declare -A specs
@@ -106,13 +138,27 @@ do
         fi
         #Build container
         echo "[CI] Build for: ${PRODUCT} and file ${NAME}"
-        #Build docker container
-        echo " docker build --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} $@ ."
-        docker build --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} "$@" .
-        if (( $? != 0 ))
-        then
-            echo "[ERROR] Failed to build docker container for: ${PRODUCT}" 1>&2
-            exit 4
+        
+        if (( ${USE_BUILDX} == 1 )); then
+            # Multi-platform build using buildx
+            echo "[CI] Building multi-platform image: ${PLATFORM}"
+            echo " docker buildx build --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} ${BUILD_ARGS} ."
+            docker buildx build --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} ${BUILD_ARGS} --load .
+            if (( $? != 0 ))
+            then
+                echo "[ERROR] Failed to build multi-platform docker container for: ${PRODUCT}" 1>&2
+                exit 4
+            fi
+        else
+            # Single platform build using standard docker build
+            echo "[CI] Building single platform image: ${PLATFORM}"
+            echo " docker build --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} ${BUILD_ARGS} ."
+            docker build --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${PRODUCT} ${BUILD_ARGS} .
+            if (( $? != 0 ))
+            then
+                echo "[ERROR] Failed to build docker container for: ${PRODUCT}" 1>&2
+                exit 4
+            fi
         fi
         
         if [ "$SKIP_PUBLISH" != "skip" ];then
