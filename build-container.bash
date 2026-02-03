@@ -202,7 +202,19 @@ do
             # Now create multi-platform manifest in registry
             if [[ ! -z "$CONTAINER_REGISTRY" ]]; then
                 echo "[CI] Creating multi-platform manifest: ${CONTAINER_REGISTRY}/${PRODUCT}"
-                MANIFEST_CMD="docker buildx build --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${CONTAINER_REGISTRY}/${PRODUCT} ${BUILD_ARGS} --push ."
+                
+                # Ensure we're using a buildx builder that supports multi-platform
+                # Check if multiarch builder exists (check anywhere in the line, not just start)
+                if docker buildx ls | grep -q "multiarch"; then
+                    BUILDER_FLAG="--builder multiarch"
+                    echo "[CI] Using multiarch builder for multi-platform manifest"
+                else
+                    BUILDER_FLAG=""
+                    echo "[CI] WARNING: multiarch builder not found, using default builder"
+                    echo "[CI] This may fail if default driver doesn't support multi-platform"
+                fi
+                
+                MANIFEST_CMD="docker buildx build ${BUILDER_FLAG} --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${CONTAINER_REGISTRY}/${PRODUCT} ${BUILD_ARGS} --push ."
                 echo " ${MANIFEST_CMD}"
                 eval ${MANIFEST_CMD}
                 if (( $? != 0 ))
