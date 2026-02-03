@@ -203,20 +203,15 @@ do
             if [[ ! -z "$CONTAINER_REGISTRY" ]]; then
                 echo "[CI] Creating multi-platform manifest: ${CONTAINER_REGISTRY}/${PRODUCT}"
                 
-                # Ensure we're using a buildx builder that supports multi-platform
-                # Check if multiarch builder exists (check anywhere in the line, not just start)
-                if docker buildx ls | grep -q "multiarch"; then
-                    echo "[CI] Using existing multiarch builder for multi-platform manifest"
-                else
-                    echo "[CI] multiarch builder not found, creating it..."
-                    docker buildx create --name multiarch --driver docker-container --bootstrap
-                    if (( $? != 0 )); then
-                        echo "[ERROR] Failed to create multiarch builder" 1>&2
-                        exit 4
-                    fi
-                    echo "[CI] multiarch builder created successfully"
+                # Verify multiarch builder exists (should be pre-installed on Jenkins agent)
+                if ! docker buildx ls | grep -q "multiarch"; then
+                    echo "[ERROR] multiarch builder not found. Please install it on the Jenkins agent:" 1>&2
+                    echo "[ERROR]   docker buildx create --name multiarch --driver docker-container --bootstrap" 1>&2
+                    echo "[ERROR] See MULTI_ARCH_BUILD.md for details." 1>&2
+                    exit 4
                 fi
                 
+                echo "[CI] Using multiarch builder for multi-platform manifest"
                 MANIFEST_CMD="docker buildx build --builder multiarch --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${CONTAINER_REGISTRY}/${PRODUCT} ${BUILD_ARGS} --push ."
                 echo " ${MANIFEST_CMD}"
                 eval ${MANIFEST_CMD}
