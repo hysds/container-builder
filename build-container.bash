@@ -206,15 +206,18 @@ do
                 # Ensure we're using a buildx builder that supports multi-platform
                 # Check if multiarch builder exists (check anywhere in the line, not just start)
                 if docker buildx ls | grep -q "multiarch"; then
-                    BUILDER_FLAG="--builder multiarch"
-                    echo "[CI] Using multiarch builder for multi-platform manifest"
+                    echo "[CI] Using existing multiarch builder for multi-platform manifest"
                 else
-                    BUILDER_FLAG=""
-                    echo "[CI] WARNING: multiarch builder not found, using default builder"
-                    echo "[CI] This may fail if default driver doesn't support multi-platform"
+                    echo "[CI] multiarch builder not found, creating it..."
+                    docker buildx create --name multiarch --driver docker-container --bootstrap
+                    if (( $? != 0 )); then
+                        echo "[ERROR] Failed to create multiarch builder" 1>&2
+                        exit 4
+                    fi
+                    echo "[CI] multiarch builder created successfully"
                 fi
                 
-                MANIFEST_CMD="docker buildx build ${BUILDER_FLAG} --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${CONTAINER_REGISTRY}/${PRODUCT} ${BUILD_ARGS} --push ."
+                MANIFEST_CMD="docker buildx build --builder multiarch --platform ${PLATFORM} --rm --force-rm -f docker/${dockerfile} -t ${CONTAINER_REGISTRY}/${PRODUCT} ${BUILD_ARGS} --push ."
                 echo " ${MANIFEST_CMD}"
                 eval ${MANIFEST_CMD}
                 if (( $? != 0 ))
