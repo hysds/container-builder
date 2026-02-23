@@ -24,8 +24,9 @@ shift
 # Default platform (backward compatible)
 PLATFORM="linux/amd64"
 USE_BUILDX=0
+SKIP_METADATA=0
 
-# Parse remaining arguments for --platform flag
+# Parse remaining arguments for --platform and --skip-metadata flags
 while [[ $# -gt 0 ]]; do
     case $1 in
         --platform)
@@ -34,6 +35,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --platform=*)
             PLATFORM="${1#*=}"
+            shift
+            ;;
+        --skip-metadata)
+            SKIP_METADATA=1
             shift
             ;;
         *)
@@ -268,13 +273,18 @@ do
             echo "Skip publishing"
         fi
 
-        # get image digest (sha256)
-        digest=$(docker inspect --format='{{index .Id}}' ${PRODUCT} | cut -d'@' -f 2)
-        ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
-        if (( $? != 0 ))
-        then
-            echo "[ERROR] Failed to make metadata and store container for: ${PRODUCT}" 1>&2
-            exit 7
+        # Publish container metadata unless --skip-metadata flag was provided
+        if [[ ${SKIP_METADATA} -eq 0 ]]; then
+            # get image digest (sha256)
+            digest=$(docker inspect --format='{{index .Id}}' ${PRODUCT} | cut -d'@' -f 2)
+            ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
+            if (( $? != 0 ))
+            then
+                echo "[ERROR] Failed to make metadata and store container for: ${PRODUCT}" 1>&2
+                exit 7
+            fi
+        else
+            echo "[CI] Skipping metadata publishing (--skip-metadata flag provided)"
         fi
     fi
     containers[${NAME}]=${PRODUCT}
@@ -285,61 +295,69 @@ do
     fi
 done
 #Loop across job specification
-for specification in docker/job-spec.json*
-do
-    specification=${specification#docker/}
-    #Get the name for this container, from repo or annotation to Dockerfile
-    NAME=${REPO}
-    if [[ "${specification}" != "job-spec.json" ]]
-    then
-        NAME=${specification#job-spec.json.}
-    fi
-    #Setup container build items
-    PRODUCT="job-${NAME}:${TAG}"    
-    echo "[CI] Build for: ${PRODUCT} and file ${NAME}"
-    cont=${containers[${NAME}]}
-    if [ -z "${cont}" ]
-    then
-        cont=${containers[${REPO}]}
-    fi
-    echo "Running Job-Met on: ${cont} docker/${specification} ${TAG} ${PRODUCT}"
-    ${DIR}/job-met.py docker/${specification} ${cont} ${TAG} ${MOZART_REST_URL} ${STORAGE}
-    if (( $? != 0 ))
-    then
-        echo "[ERROR] Failed to create metadata and ingest job-spec for: ${PRODUCT}" 1>&2
-        exit 3
-    fi
-    specs[${NAME}]=${PRODUCT}
-done
-#Loop across job specification
-let iocnt=`ls docker/hysds-io.json* | wc -l`
-if (( $iocnt == 0 ))
-then
-    exit 0
+if [[ ${SKIP_METADATA} -eq 0 ]]; then
+    for specification in docker/job-spec.json*
+    do
+        specification=${specification#docker/}
+        #Get the name for this container, from repo or annotation to Dockerfile
+        NAME=${REPO}
+        if [[ "${specification}" != "job-spec.json" ]]
+        then
+            NAME=${specification#job-spec.json.}
+        fi
+        #Setup container build items
+        PRODUCT="job-${NAME}:${TAG}"    
+        echo "[CI] Build for: ${PRODUCT} and file ${NAME}"
+        cont=${containers[${NAME}]}
+        if [ -z "${cont}" ]
+        then
+            cont=${containers[${REPO}]}
+        fi
+        echo "Running Job-Met on: ${cont} docker/${specification} ${TAG} ${PRODUCT}"
+        ${DIR}/job-met.py docker/${specification} ${cont} ${TAG} ${MOZART_REST_URL} ${STORAGE}
+        if (( $? != 0 ))
+        then
+            echo "[ERROR] Failed to create metadata and ingest job-spec for: ${PRODUCT}" 1>&2
+            exit 3
+        fi
+        specs[${NAME}]=${PRODUCT}
+    done
+else
+    echo "[CI] Skipping job-spec metadata publishing (--skip-metadata flag provided)"
 fi
-for wiring in docker/hysds-io.json*
-do
-    wiring=${wiring#docker/}
-    #Get the name for this container, from repo or annotation to Dockerfile
-    NAME=${REPO}
-    if [[ "${wiring}" != "hysds-io.json" ]]
+#Loop across hysds-io specification
+if [[ ${SKIP_METADATA} -eq 0 ]]; then
+    let iocnt=`ls docker/hysds-io.json* | wc -l`
+    if (( $iocnt == 0 ))
     then
-        NAME=${wiring#hysds-io.json.}
+        exit 0
     fi
-    #Setup container build items
-    PRODUCT="hysds-io-${NAME}:${TAG}"    
-    echo "[CI] Build for: ${PRODUCT} and file ${NAME}"
-    spec=${specs[${NAME}]}
-    if [ -z "${cont}" ]
-    then
-        spec=${specs[${REPO}]}
-    fi
-    echo "Running IO-Met on: ${cont} docker/${wiring} ${TAG} ${PRODUCT}"
-    ${DIR}/io-met.py docker/${wiring} ${spec} ${TAG} ${MOZART_REST_URL} ${GRQ_REST_URL}
-    if (( $? != 0 ))
-    then
-        echo "[ERROR] Failed to create metadata and ingest hysds-io for: ${PRODUCT}" 1>&2
-        exit 3
-    fi
-done
+    for wiring in docker/hysds-io.json*
+    do
+        wiring=${wiring#docker/}
+        #Get the name for this container, from repo or annotation to Dockerfile
+        NAME=${REPO}
+        if [[ "${wiring}" != "hysds-io.json" ]]
+        then
+            NAME=${wiring#hysds-io.json.}
+        fi
+        #Setup container build items
+        PRODUCT="hysds-io-${NAME}:${TAG}"    
+        echo "[CI] Build for: ${PRODUCT} and file ${NAME}"
+        spec=${specs[${NAME}]}
+        if [ -z "${cont}" ]
+        then
+            spec=${specs[${REPO}]}
+        fi
+        echo "Running IO-Met on: ${cont} docker/${wiring} ${TAG} ${PRODUCT}"
+        ${DIR}/io-met.py docker/${wiring} ${spec} ${TAG} ${MOZART_REST_URL} ${GRQ_REST_URL}
+        if (( $? != 0 ))
+        then
+            echo "[ERROR] Failed to create metadata and ingest hysds-io for: ${PRODUCT}" 1>&2
+            exit 3
+        fi
+    done
+else
+    echo "[CI] Skipping hysds-io metadata publishing (--skip-metadata flag provided)"
+fi
 exit 0
