@@ -19,10 +19,13 @@ if __name__ == "__main__":
     digest = sys.argv[5]
     mozart_rest_url = sys.argv[6]
 
-    url = os.path.join(repo, os.path.basename(product))
-
-    # OSAKA call goes here
-    osaka.main.put("./" + product, url)
+    # Skip osaka upload if no product tarball (e.g., for multi-platform manifests)
+    if product:
+        url = os.path.join(repo, os.path.basename(product))
+        # OSAKA call goes here
+        osaka.main.put("./" + product, url)
+    else:
+        url = ""
 
     metadata = {
         "name": ident,
