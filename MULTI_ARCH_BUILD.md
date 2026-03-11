@@ -1,302 +1,302 @@
-# Multi-Architecture Container Builds
+# Multi-Architecture Container Support
 
 ## Overview
 
-The `build-container.bash` script now supports building containers for multiple architectures using the optional `--platform` argument.
+The `container-met.py` script now supports registering containers for multiple architectures (x86_64 and ARM64) by accepting an optional ARM64 tarball parameter. This enables HySDS workers to automatically download and load the correct container image based on their architecture.
 
 ## Backward Compatibility
 
-✅ **Default behavior unchanged**: If `--platform` is not specified, builds for `linux/amd64` (x86_64) only
+✅ **Default behavior unchanged**: If ARM64 tarball is not provided, registers x86_64 only (existing behavior)
 ✅ **Existing invocations work**: No changes needed to existing CI/CD pipelines
+✅ **Legacy `url` field preserved**: Single URL field maintained for backward compatibility
 
 ## Usage
 
-### Option 1: Build for x86_64 Only (Default)
+### Registering x86_64 Container Only (Default)
 
 ```bash
-# These are equivalent:
-./build-container.bash ${REPO} ${BRANCH} ${STORAGE} --build-arg id=$UID --build-arg gid=$GID
-
-./build-container.bash ${REPO} ${BRANCH} ${STORAGE} --build-arg id=$UID --build-arg gid=$GID --platform linux/amd64
-```
-
-### Option 2: Build for ARM64 Only
-
-```bash
-./build-container.bash ${REPO} ${BRANCH} ${STORAGE} --build-arg id=$UID --build-arg gid=$GID --platform linux/arm64
-```
-
-**Note**: Requires QEMU on x86_64 hosts (see Prerequisites below)
-
-### Option 3: Build Multi-Platform Image (x86_64 + ARM64)
-
-```bash
-./build-container.bash ${REPO} ${BRANCH} ${STORAGE} --build-arg id=$UID --build-arg gid=$GID --platform linux/amd64,linux/arm64
+./container-met.py \
+  container-name:tag \
+  1.0.0 \
+  container-name-tag.tar.gz \
+  s3://bucket \
+  sha256:digest \
+  http://mozart-rest-url
 ```
 
 **What This Does:**
-- Builds **both architectures sequentially**
-- Creates **two separate tarballs**:
-  - `container-name:tag.tar.gz` (x86_64)
-  - `container-name:tag-arm64.tar.gz` (ARM64)
-- Pushes **individual images** to registry with architecture-specific tags
-- Creates a **multi-platform manifest** in the registry (single tag that works on both architectures)
+- Uploads x86_64 tarball to storage (S3/local)
+- Registers container metadata with Mozart
+- Sets `url` field to x86_64 tarball URL
+- Sets `urls` field with x86_64 mappings only
 
-**Requirements:**
-- Docker Buildx configured (see Prerequisites below)
-- CONTAINER_REGISTRY set (for multi-platform manifest)
-
-## Platform Argument Formats
-
-The `--platform` argument accepts:
+### Registering Multi-Architecture Container (x86_64 + ARM64)
 
 ```bash
---platform linux/amd64              # x86_64 only
---platform linux/arm64              # ARM64 only
---platform linux/amd64,linux/arm64  # Multi-platform (both)
---platform=linux/arm64              # Alternative syntax
+./container-met.py \
+  container-name:tag \
+  1.0.0 \
+  container-name-tag.tar.gz \
+  s3://bucket \
+  sha256:digest \
+  http://mozart-rest-url \
+  container-name-tag-arm64.tar.gz
 ```
 
-## Prerequisites
+**What This Does:**
+- Uploads **both** x86_64 and ARM64 tarballs to storage
+- Registers container metadata with Mozart
+- Sets `url` field to x86_64 tarball URL (backward compatibility)
+- Sets `urls` field with architecture-specific mappings:
+  - `x86_64` / `amd64` → x86_64 tarball URL
+  - `arm64` / `aarch64` → ARM64 tarball URL
 
-### For ARM64 Builds on x86_64 Host
-
-Install QEMU for emulation:
+## Arguments
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y qemu-user-static binfmt-support
-docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+container-met.py <ident> <version> <product> <repo> <digest> <mozart_url> [product_arm64]
 ```
 
-Verify:
-```bash
-docker run --rm --platform linux/arm64 alpine uname -m
-# Should output: aarch64
+| Argument | Required | Description | Example |
+|----------|----------|-------------|----------|
+| `ident` | Yes | Container name and tag | `container-name:tag` |
+| `version` | Yes | Container version | `1.0.0` |
+| `product` | Yes | x86_64 tarball filename | `container-name-tag.tar.gz` |
+| `repo` | Yes | Storage URL (S3 or local) | `s3://bucket` or `/path/to/storage` |
+| `digest` | Yes | Container image digest | `sha256:abc123...` |
+| `mozart_url` | Yes | Mozart REST API URL | `http://mozart:8888/api/v0.2` |
+| `product_arm64` | **Optional** | ARM64 tarball filename | `container-name-tag-arm64.tar.gz` |
+
+## Metadata Schema
+
+### Container Metadata Registered with Mozart
+
+**Single Architecture (x86_64 only):**
+```json
+{
+  "name": "container-name:tag",
+  "version": "1.0.0",
+  "url": "s3://bucket/container-name-tag.tar.gz",
+  "urls": "{
+    \"x86_64\": \"s3://bucket/container-name-tag.tar.gz\",
+    \"amd64\": \"s3://bucket/container-name-tag.tar.gz\"
+  }",
+  "digest": "sha256:...",
+  "resource": "container"
+}
 ```
 
-### For Multi-Platform Builds (REQUIRED)
-
-**⚠️ IMPORTANT**: The `multiarch` builder must be installed on each Jenkins agent before running multi-platform builds.
-
-#### One-Time Setup on Jenkins Agent
-
-SSH to the Jenkins agent as the `hysdsops` user and run:
-
-```bash
-# 1. Remove any existing broken builder (if applicable)
-docker buildx rm multiarch 2>/dev/null || true
-
-# 2. Create the multiarch builder with docker-container driver
-docker buildx create --name multiarch --driver docker-container --bootstrap
-
-# 3. Verify it was created successfully
-docker buildx ls
-# Should show:
-# NAME/NODE        DRIVER/ENDPOINT                   STATUS    BUILDKIT   PLATFORMS
-# multiarch*       docker-container
-#  \_ multiarch0    \_ unix:///var/run/docker.sock   running   v0.x.x     linux/amd64, linux/arm64, ...
-
-# 4. Inspect the builder to ensure it's functional
-docker buildx inspect multiarch
-# Should show Status: running and Platforms including linux/amd64 and linux/arm64
-
-# 5. Set up QEMU for ARM64 emulation (if not already done)
-docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+**Multi-Architecture (x86_64 + ARM64):**
+```json
+{
+  "name": "container-name:tag",
+  "version": "1.0.0",
+  "url": "s3://bucket/container-name-tag.tar.gz",
+  "urls": "{
+    \"x86_64\": \"s3://bucket/container-name-tag.tar.gz\",
+    \"amd64\": \"s3://bucket/container-name-tag.tar.gz\",
+    \"arm64\": \"s3://bucket/container-name-tag-arm64.tar.gz\",
+    \"aarch64\": \"s3://bucket/container-name-tag-arm64.tar.gz\"
+  }",
+  "digest": "sha256:...",
+  "resource": "container"
+}
 ```
 
-#### Verification
-
-After setup, verify the builder is working:
-
-```bash
-# Check builder exists and is running
-docker buildx ls | grep multiarch
-
-# Test a simple multi-platform build
-docker buildx build --builder multiarch --platform linux/amd64,linux/arm64 -t test:multiarch - <<EOF
-FROM alpine
-RUN uname -m
-EOF
-```
-
-#### Troubleshooting
-
-**If the builder exists but is not functional:**
-```bash
-# Remove and recreate
-docker buildx rm multiarch
-docker buildx create --name multiarch --driver docker-container --bootstrap
-```
-
-**If you see "ERROR: existing instance for multiarch but no append mode":**
-```bash
-# The builder already exists, just verify it's working
-docker buildx inspect multiarch
-# If it shows Status: running, you're good to go
-```
+**Key Points:**
+- `url` field: Single URL for backward compatibility (always x86_64)
+- `urls` field: JSON string containing architecture-specific URL mappings
+- Both `x86_64` and `amd64` map to the same x86_64 tarball
+- Both `arm64` and `aarch64` map to the same ARM64 tarball
 
 ## Jenkins/CI Integration
 
-### Using Updated Jenkins Configuration Files
-
-The Jenkins configuration files (`config.xml` and `config-branch.xml`) have been updated with a **PLATFORM** choice parameter.
-
-**When you create/update Jenkins jobs using these configs, users will see:**
-- Dropdown parameter: **PLATFORM**
-- Choices:
-  - `linux/amd64` (x86_64 - default)
-  - `linux/arm64` (ARM64)
-  - `linux/amd64,linux/arm64` (Multi-platform)
-
-**The parameter is automatically passed to the build script:**
-```bash
-~/verdi/ops/container-builder/build-container.bash ${REPO} ${BRANCH} ${STORAGE} \
-    --build-arg id=$UID --build-arg gid=$GID --platform $PLATFORM
-```
-
-### Example: Build x86_64 Only (Backward Compatible)
+### Example: Register x86_64 Container Only (Backward Compatible)
 
 ```groovy
 // Existing code - no changes needed
 sh """
-    BRANCH="\${GIT_BRANCH##*/}"
-    REPO="\${GIT_URL#*://*/}"
-    REPO="\${REPO%.git}"
-    REPO="\${REPO//\\//_}"
-    STORAGE="\$STORAGE_URL"
-    export GIT_OAUTH_TOKEN="\$GIT_OAUTH_TOKEN"
-    ~/verdi/ops/container-builder/build-container.bash \${REPO} \${BRANCH} \${STORAGE} --build-arg id=$UID --build-arg gid=$GID
+    IMAGE="container-\${REPO}:${TAG}"
+    TARBALL="\${IMAGE//:\//_}.tar.gz"
+    DIGEST=\$(docker inspect --format='{{.Id}}' \${IMAGE})
+    
+    ~/verdi/ops/container-builder/container-met.py \\
+        \${IMAGE} \\
+        ${TAG} \\
+        \${TARBALL} \\
+        \${STORAGE_URL} \\
+        \${DIGEST} \\
+        \${MOZART_REST_URL}
 """
 ```
 
-### Example: Build ARM64 with Parameter
+### Example: Register Multi-Architecture Container
 
 ```groovy
-parameters {
-    choice(name: 'PLATFORM', choices: ['linux/amd64', 'linux/arm64'], description: 'Target platform')
-}
+sh """
+    IMAGE="container-\${REPO}:${TAG}"
+    TARBALL_X86="\${IMAGE//:\//_}.tar.gz"
+    TARBALL_ARM64="\${IMAGE//:\//_}-arm64.tar.gz"
+    DIGEST=\$(docker inspect --format='{{.Id}}' \${IMAGE})
+    
+    # Register both architectures
+    ~/verdi/ops/container-builder/container-met.py \\
+        \${IMAGE} \\
+        ${TAG} \\
+        \${TARBALL_X86} \\
+        \${STORAGE_URL} \\
+        \${DIGEST} \\
+        \${MOZART_REST_URL} \\
+        \${TARBALL_ARM64}
+"""
+```
 
-stages {
-    stage('Build Container') {
-        steps {
-            sh """
-                BRANCH="\${GIT_BRANCH##*/}"
-                REPO="\${GIT_URL#*://*/}"
-                REPO="\${REPO%.git}"
-                REPO="\${REPO//\\//_}"
-                STORAGE="\$STORAGE_URL"
-                export GIT_OAUTH_TOKEN="\$GIT_OAUTH_TOKEN"
-                ~/verdi/ops/container-builder/build-container.bash \${REPO} \${BRANCH} \${STORAGE} \\
-                    --build-arg id=$UID --build-arg gid=$GID \\
-                    --platform ${params.PLATFORM}
-            """
-        }
+### Example: Complete Multi-Platform Build and Register
+
+```groovy
+stage('Build and Register Multi-Arch Container') {
+    steps {
+        sh """
+            IMAGE="container-\${REPO}:${TAG}"
+            TARBALL_X86="\${IMAGE//:\//_}.tar.gz"
+            TARBALL_ARM64="\${IMAGE//:\//_}-arm64.tar.gz"
+            
+            # Build x86_64 image
+            docker buildx build --platform linux/amd64 -t \${IMAGE} --load .
+            docker save \${IMAGE} | gzip > \${TARBALL_X86}
+            
+            # Build ARM64 image
+            docker buildx build --platform linux/arm64 -t \${IMAGE} --load .
+            docker save \${IMAGE} | gzip > \${TARBALL_ARM64}
+            
+            # Get digest from x86_64 image
+            DIGEST=\$(docker inspect --format='{{.Id}}' \${IMAGE})
+            
+            # Register both architectures
+            ~/verdi/ops/container-builder/container-met.py \\
+                \${IMAGE} \\
+                ${TAG} \\
+                \${TARBALL_X86} \\
+                \${STORAGE_URL} \\
+                \${DIGEST} \\
+                \${MOZART_REST_URL} \\
+                \${TARBALL_ARM64}
+        """
     }
 }
 ```
 
-### Example: Build Both Architectures (Separate Jobs)
-
-**Job 1: Build x86_64**
-```groovy
-sh """
-    ~/verdi/ops/container-builder/build-container.bash \${REPO} \${BRANCH} \${STORAGE} \\
-        --build-arg id=$UID --build-arg gid=$GID \\
-        --platform linux/amd64
-"""
-```
-
-**Job 2: Build ARM64**
-```groovy
-sh """
-    ~/verdi/ops/container-builder/build-container.bash \${REPO} \${BRANCH} \${STORAGE} \\
-        --build-arg id=$UID --build-arg gid=$GID \\
-        --platform linux/arm64
-"""
-```
-
 ## How It Works
 
-### Single Platform Build
-- Uses standard `docker build` command
-- Adds `--platform` flag to specify target architecture
-- Fast for native architecture, slower with QEMU emulation for non-native
+### Upload Process
+1. **x86_64 tarball**: Always uploaded to storage (required)
+2. **ARM64 tarball**: Uploaded only if provided (optional)
+3. **Storage**: Uses `osaka.main.put()` to upload to S3 or local storage
 
-### Multi-Platform Build
-- Detects comma in platform string (e.g., `linux/amd64,linux/arm64`)
-- Automatically switches to `docker buildx build`
-- Creates a single image manifest that works on both architectures
-- Uses `--load` flag to load the image into local Docker daemon
+### Metadata Registration
+1. **Constructs metadata dict** with name, version, url, digest, resource
+2. **Adds `urls` field** as JSON string with architecture mappings
+3. **POSTs to Mozart API** at `/container/add` endpoint
+4. **Mozart stores** in Elasticsearch containers index
 
-## Container Naming
+### Worker Container Selection
+When a HySDS worker needs to load a container:
+1. Worker reads `container_image_urls` from job metadata
+2. Detects current architecture using `platform.machine()`
+3. Selects appropriate URL from `urls` mapping
+4. Downloads and loads architecture-specific tarball
+5. Falls back to `url` field if `urls` not available (backward compatibility)
 
-Container names remain unchanged regardless of platform:
+## Tarball Naming Convention
+
+**x86_64 tarball** (no suffix for backward compatibility):
 ```
-container-${REPO}:${TAG}
+container-name-tag.tar.gz
 ```
 
-The platform information is stored in the image manifest, not the tag name.
+**ARM64 tarball** (with `-arm64` suffix):
+```
+container-name-tag-arm64.tar.gz
+```
 
-## Limitations
+## Requirements
 
-### Multi-Platform Builds
-- **Sequential builds**: Architectures are built one after another (not parallel)
-- **Longer build time**: Takes sum of both architecture build times
-- **Requires CONTAINER_REGISTRY**: For creating the multi-platform manifest
-- **Requires Docker Buildx**: Must be configured with `docker-container` driver
+### For container-met.py
+- Python 3.x
+- `requests` library
+- `osaka` library (for S3/storage uploads)
+- Mozart REST API accessible
 
-### Performance
-- **ARM64 on x86_64 via QEMU**: 5-10x slower than native
-- **Multi-platform builds**: Sequential, so total time = x86_64 time + ARM64 time
-
-### Build Time Comparison
-Example for a typical container:
-
-| Option | Time | Tarballs | Multi-Platform Manifest |
-|--------|------|----------|------------------------|
-| `linux/amd64` only | ~5 min | ✅ 1 tarball | ❌ |
-| `linux/arm64` only | ~30 min (QEMU) | ✅ 1 tarball | ❌ |
-| `linux/amd64,linux/arm64` | ~35 min (sequential) | ✅ 2 tarballs | ✅ |
-| Two separate jobs (parallel) | ~30 min (parallel) | ✅ 2 tarballs | ❌ (manual) |
+### For Multi-Architecture Support (Full System)
+- **Mozart**: Updated API endpoints to accept `urls` parameter
+- **HySDS**: Updated container loading logic to use architecture-specific URLs
+- **hysds_commons**: Updated job resolution to pass `container_image_urls`
+- **Workers**: Must be running updated HySDS code
 
 ## Troubleshooting
 
-### Error: "exec format error"
-**Cause**: QEMU is not installed or not configured.  
-**Solution**: See Prerequisites section for QEMU installation.
+### Error: "Metadata requires: ident version product repo digest mozart_url [product_arm64]"
+**Cause**: Missing required arguments.  
+**Solution**: Provide all 6 required arguments. The 7th (ARM64 tarball) is optional.
 
-### Error: "unknown flag: --platform"
-**Cause**: Docker version is too old.  
-**Solution**: Requires Docker 18.09+ for `--platform` flag. Upgrade Docker.
+### Error: Upload fails to S3
+**Cause**: Invalid S3 credentials or permissions.  
+**Solution**: Ensure AWS credentials are configured and have write access to the bucket.
 
-### Error: "Multi-platform build is not supported for the docker driver"
-**Cause**: Docker Buildx is not available or the default driver is being used.  
-**Solution**: Install Docker 19.03+ and create the `multiarch` builder (see Prerequisites section).
+### Error: Mozart API POST fails
+**Cause**: Mozart REST API is unreachable or returns error.  
+**Solution**: 
+- Verify Mozart URL is correct and accessible
+- Check Mozart logs for API errors
+- Ensure Mozart API endpoints are updated to accept `urls` parameter
 
-### Error: "multiarch builder not found"
-**Cause**: The `multiarch` builder has not been created on the Jenkins agent.  
-**Solution**: Follow the one-time setup instructions in the Prerequisites section to create the builder.
+### Worker downloads wrong architecture
+**Cause**: Worker is running old HySDS code without multi-arch support.  
+**Solution**: Update HySDS on workers and restart celery workers:
+```bash
+cd /home/ops/verdi/ops/hysds
+git pull
+pip install -e .
+supervisorctl restart all
+```
 
-### Multi-platform build creates two tarballs
-This is **expected and desired**! When you build with `linux/amd64,linux/arm64`, you get:
-- `container-name:tag.tar.gz` (x86_64)
-- `container-name:tag-arm64.tar.gz` (ARM64)
-
-Both tarballs are created automatically in a single job run. This allows you to distribute both architectures separately.
+### Container registered but `urls` field missing in Mozart
+**Cause**: Mozart API not updated to handle `urls` parameter.  
+**Solution**: Deploy updated Mozart code with multi-architecture support.
 
 ## Migration Guide
 
 ### Existing Pipelines
-No changes required! The script is fully backward compatible.
+No changes required! The script is fully backward compatible. Existing 6-argument invocations continue to work.
 
-### Adding ARM64 Support
-1. Install QEMU on build host (one-time setup)
-2. Add `--platform linux/arm64` to build command
-3. Run as separate job or with parameter selection
+### Adding ARM64 Support to Existing Container
+1. Build ARM64 tarball (using Docker Buildx or native ARM64 host)
+2. Add ARM64 tarball as 7th argument to `container-met.py`
+3. Script automatically uploads both tarballs and registers with architecture mappings
 
-### Creating Multi-Platform Images
-1. **Install the `multiarch` builder on Jenkins agent** (one-time setup - see Prerequisites section)
-2. Install QEMU on build host (one-time setup)
-3. Use `--platform linux/amd64,linux/arm64`
-4. Ensure `CONTAINER_REGISTRY` is set for manifest creation
+### System-Wide Multi-Architecture Deployment
+
+**Phase 1: Update Core Components**
+1. Deploy updated `container-builder` (this repo)
+2. Deploy updated `mozart` with `urls` parameter support
+3. Deploy updated `hysds` with architecture-aware container loading
+4. Deploy updated `hysds_commons` with `container_image_urls` support
+
+**Phase 2: Update Workers**
+1. Update HySDS code on all workers
+2. Restart celery workers to load new code
+3. Verify workers can read architecture from `platform.machine()`
+
+**Phase 3: Register Multi-Arch Containers**
+1. Build both x86_64 and ARM64 tarballs
+2. Register using updated `container-met.py` with both tarballs
+3. Workers automatically select correct architecture
+
+### Verification
+
+Check that multi-arch metadata is registered correctly:
+```bash
+curl -X GET "http://mozart:9200/containers/_doc/container-name:tag?pretty"
+```
+
+Should show both `url` and `urls` fields in the response.
