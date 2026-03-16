@@ -277,7 +277,15 @@ do
         if [[ ${SKIP_METADATA} -eq 0 ]]; then
             # get image digest (sha256)
             digest=$(docker inspect --format='{{index .Id}}' ${PRODUCT} | cut -d'@' -f 2)
-            ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
+            
+            # For multi-platform builds, pass ARM64 tarball as 7th argument
+            if (( ${USE_BUILDX} == 2 )); then
+                GZ_ARM64="${PRODUCT}-arm64.tar.gz"
+                ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest} ${MOZART_REST_URL} ${GZ_ARM64}
+            else
+                ${DIR}/container-met.py ${PRODUCT} ${TAG} ${GZ} ${STORAGE} ${digest} ${MOZART_REST_URL}
+            fi
+            
             if (( $? != 0 ))
             then
                 echo "[ERROR] Failed to make metadata and store container for: ${PRODUCT}" 1>&2
